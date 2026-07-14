@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Timetable Room Assignment - Timetable &amp; Assignment</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans+Condensed:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#121c2c",
+                        "inverse-surface": "#293041",
+                        "surface-container-high": "#e1e8fe",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed-variant": "#0036bb",
+                        "tertiary": "#9b3400",
+                        "on-secondary": "#ffffff",
+                        "confirm-green": "#1E9E6B",
+                        "secondary-fixed": "#d9e2fa",
+                        "on-tertiary-fixed-variant": "#802a00",
+                        "on-surface": "#141b2b",
+                        "inverse-on-surface": "#edf0ff",
+                        "secondary-container": "#d9e2fa",
+                        "conflict-red": "#E5484D",
+                        "background": "#faf9ff",
+                        "inverse-primary": "#b8c4ff",
+                        "tertiary-fixed": "#ffdbcf",
+                        "primary": "#0043e1",
+                        "on-tertiary-fixed": "#380d00",
+                        "outline-variant": "#c4c5d9",
+                        "surface-container": "#e9edff",
+                        "on-primary-container": "#f3f2ff",
+                        "on-tertiary-container": "#fff0ec",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#434656",
+                        "on-secondary-container": "#5b6478",
+                        "on-background": "#141b2b",
+                        "surface-tint": "#0e4bee",
+                        "on-primary-fixed": "#001354",
+                        "secondary-fixed-dim": "#bdc6dd",
+                        "on-secondary-fixed-variant": "#3e475a",
+                        "primary-container": "#2f5eff",
+                        "tertiary-container": "#c44400",
+                        "outline": "#747687",
+                        "surface-dim": "#d3daef",
+                        "surface": "#faf9ff",
+                        "on-primary": "#ffffff",
+                        "secondary": "#555e72",
+                        "surface-variant": "#dce2f8",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-highest": "#dce2f8",
+                        "error-container": "#ffdad6",
+                        "ink": "#1C2333",
+                        "paper": "#FAFBFC",
+                        "primary-fixed": "#dde1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-bright": "#faf9ff",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb59a",
+                        "primary-fixed-dim": "#b8c4ff",
+                        "surface-container-low": "#f1f3ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "1rem",
+                        "stack-gap": "1.5rem",
+                        "container-max": "1440px",
+                        "cell-padding": "0.75rem",
+                        "sidebar-width": "240px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "data-tabular": ["IBM Plex Mono"],
+                        "headline-lg": ["IBM Plex Sans Condensed"],
+                        "headline-md": ["IBM Plex Sans Condensed"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-md": ["15px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(116, 118, 135, 0.2);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(116, 118, 135, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md font-body-md h-full flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-sidebar-width bg-paper dark:bg-inverse-surface border-r border-outline-variant/20 flex flex-col h-full py-gutter px-3 z-20">
+<!-- Header -->
+<div class="flex items-center gap-3 mb-8 px-2 mt-2">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center shrink-0 border border-outline-variant/20">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">dataset</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary truncate">Scheduler Pro</h1>
+<p class="font-body-sm text-body-sm text-secondary truncate">Admin Portal</p>
+</div>
+</div>
+<!-- Main Tabs -->
+<div class="flex flex-col gap-1 flex-grow">
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors active:scale-95 duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors active:scale-95 duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">cloud_upload</span>
+<span class="font-body-md text-body-md">Upload</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors active:scale-95 duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">meeting_room</span>
+<span class="font-body-md text-body-md">Rooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">calendar_month</span>
+<span class="font-body-md text-body-md font-medium">Timetable &amp; Assignment</span>
+</a>
+</div>
+<!-- Footer Tabs -->
+<div class="flex flex-col gap-1 mt-auto pt-4 border-t border-outline-variant/20">
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors active:scale-95 duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="font-body-md text-body-md">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors active:scale-95 duration-150 rounded-lg" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-md text-body-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-w-0 ml-[240px]">
+<!-- TopNavBar -->
+<header class="docked full-width top-0 bg-surface dark:bg-surface-container-lowest border-b border-outline-variant/20 flex justify-between items-center h-16 px-gutter w-full max-w-container-max mx-auto z-10 shrink-0">
+<div class="flex items-center gap-6">
+<!-- Navigation Links (Contextual) -->
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm active:opacity-80 flex items-center gap-2" href="#">
+                        Semester Fall 2024
+                        <span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
+</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm active:opacity-80 flex items-center gap-2" href="#">
+                        Main Campus
+                        <span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
+</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<!-- Actions -->
+<button class="hidden lg:flex items-center gap-2 px-4 py-2 border border-outline/20 text-on-surface-variant hover:bg-surface-container hover:text-on-surface rounded transition-colors font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    Export PDF
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary hover:bg-primary/90 rounded transition-colors font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px]">cloud_upload</span>
+                    Upload Timetable
+                </button>
+<div class="w-px h-6 bg-outline-variant/20 mx-2"></div>
+<button class="text-secondary hover:text-on-surface transition-colors p-1 rounded hover:bg-surface-container">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-secondary hover:text-on-surface transition-colors p-1 rounded hover:bg-surface-container mr-2">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<img alt="Coordinator Avatar" class="w-8 h-8 rounded-full border border-outline-variant/20 object-cover" data-alt="A close up, professional headshot of a female administrative coordinator with glasses, smiling subtly. She is wearing a modern dark blazer over a light blouse. The background is a slightly blurred, bright modern office setting with cool, daylight lighting reflecting off glass walls. The aesthetic is clean, corporate, and trustworthy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuArdHxqn9kC6OsNmj_2uS1fTDMN4E3KWk3D7FkY_r27RKLGH1pGZOToRecUN5xfKH46DRMXVNFl089k9PbSW0ctGBRzChPoB_hf4aYlDtdc2RpN-We9L8LyRSvbc1TY1x13T6TVx1FHy7U9FNQrZMpbFVAZt-Lge3DwlU4p9FDs-ZqqxW1NH_JfSles2t8gvDyWMoVg8RS9--KGXJwsly5uQ_U9oV-P4UmEQy2bJbj74qdLRtv6mL3jVFPMNBFwTGIfbuEsQIQR3enr"/>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-auto custom-scrollbar bg-surface-container-lowest p-stack-gap flex flex-col gap-stack-gap">
+<div class="max-w-container-max mx-auto w-full flex flex-col gap-6 h-full">
+<!-- Page Header & Controls -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-ink">Timetable &amp; Assignment</h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">Computer Science Division • B.Sc. Cohort A</p>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex bg-surface-container p-1 rounded-lg border border-outline-variant/20">
+<button class="px-3 py-1.5 bg-paper shadow-sm rounded text-primary font-body-sm text-body-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">grid_view</span>
+                                Grid
+                            </button>
+<button class="px-3 py-1.5 text-secondary hover:text-on-surface rounded font-body-sm text-body-sm flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[18px]">view_list</span>
+                                List
+                            </button>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary hover:bg-primary/90 rounded transition-colors font-body-sm text-body-sm active:bg-primary/80">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                            Run Assignment
+                        </button>
+</div>
+</div>
+<!-- Filters Bar -->
+<div class="flex flex-wrap gap-3 p-3 bg-paper border border-outline-variant/20 rounded-lg shrink-0">
+<div class="flex-1 min-w-[200px]">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-[18px]">search</span>
+<input class="w-full pl-9 pr-3 py-2 bg-surface border border-outline/20 rounded font-body-sm text-body-sm focus:border-primary focus:ring-0 focus:outline-none placeholder-secondary/60 transition-colors" placeholder="Search by subject, faculty, or room..." type="text"/>
+</div>
+</div>
+<select class="px-3 py-2 bg-surface border border-outline/20 rounded font-body-sm text-body-sm focus:border-primary focus:ring-0 focus:outline-none text-on-surface appearance-none pr-8 relative min-w-[140px]">
+<option>Division: CS</option>
+<option>Division: ENG</option>
+<option>Division: MATH</option>
+</select>
+<select class="px-3 py-2 bg-surface border border-outline/20 rounded font-body-sm text-body-sm focus:border-primary focus:ring-0 focus:outline-none text-on-surface appearance-none pr-8 min-w-[140px]">
+<option>Term: Fall 2024</option>
+<option>Term: Spring 2025</option>
+</select>
+</div>
+<!-- Conflicts Panel (Persistent Alert) -->
+<div class="bg-error-container/20 border-l-4 border-l-conflict-red border border-outline-variant/20 rounded-r-lg p-4 shrink-0">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-conflict-red shrink-0 mt-0.5">warning</span>
+<div class="flex-1">
+<h3 class="font-headline-md text-body-md font-semibold text-ink">2 Unresolved Conflicts</h3>
+<div class="mt-3 flex flex-col gap-2">
+<!-- Conflict Item 1 -->
+<div class="flex items-center justify-between bg-paper p-2 rounded border border-outline-variant/20 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="font-data-tabular text-data-tabular bg-surface-container-high px-2 py-1 rounded">CS-301</div>
+<div class="font-body-sm text-body-sm text-secondary">Mon 09:00 - Dr. Smith</div>
+<div class="font-body-sm text-body-sm text-conflict-red font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">group_off</span>
+                                            Capacity Exceeded (60/45)
+                                        </div>
+</div>
+<div class="flex items-center gap-2">
+<select class="px-2 py-1 bg-surface border border-outline/20 rounded font-body-sm text-body-sm focus:border-primary focus:ring-0 focus:outline-none text-on-surface min-w-[120px]">
+<option>Select Room...</option>
+<option>Auditorium A (100)</option>
+<option>Hall 3B (80)</option>
+</select>
+<button class="px-3 py-1 bg-surface border border-outline/20 hover:bg-surface-container rounded text-on-surface font-body-sm text-body-sm transition-colors">Resolve</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Matrix Grid Container -->
+<div class="flex-1 min-h-[500px] bg-paper border border-outline-variant/20 rounded-lg overflow-hidden flex flex-col shadow-sm">
+<!-- Grid Header (Days) -->
+<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] bg-surface-container border-b border-outline-variant/20 shrink-0">
+<div class="p-3 border-r border-outline-variant/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary text-[18px]">schedule</span>
+</div>
+<div class="p-3 border-r border-outline-variant/20 font-headline-md text-body-sm text-secondary text-center uppercase tracking-wider">Monday</div>
+<div class="p-3 border-r border-outline-variant/20 font-headline-md text-body-sm text-secondary text-center uppercase tracking-wider">Tuesday</div>
+<div class="p-3 border-r border-outline-variant/20 font-headline-md text-body-sm text-secondary text-center uppercase tracking-wider">Wednesday</div>
+<div class="p-3 border-r border-outline-variant/20 font-headline-md text-body-sm text-secondary text-center uppercase tracking-wider">Thursday</div>
+<div class="p-3 font-headline-md text-body-sm text-secondary text-center uppercase tracking-wider">Friday</div>
+</div>
+<!-- Grid Body -->
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- 08:00 Row -->
+<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] border-b border-outline-variant/20 min-h-[100px] group/row">
+<div class="p-3 border-r border-outline-variant/20 font-data-tabular text-data-tabular text-secondary flex items-start justify-center pt-4 bg-surface/50">08:00</div>
+<!-- Monday 08:00 (Auto-assigned) -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/50 transition-colors cursor-pointer p-1">
+<div class="h-full border-l-[4px] border-l-confirm-green bg-surface p-2 flex flex-col gap-1 border border-outline-variant/20 rounded shadow-sm hover:shadow">
+<div class="flex justify-between items-start">
+<span class="font-data-tabular text-data-tabular font-medium text-ink">CS-101</span>
+<span class="font-label-caps text-label-caps bg-confirm-green/10 text-confirm-green px-1 rounded">LEC</span>
+</div>
+<span class="font-body-sm text-label-caps text-secondary truncate">Prof. Turing</span>
+<div class="mt-auto flex items-center gap-1 font-data-tabular text-[12px] text-ink pt-1 border-t border-outline-variant/20">
+<span class="material-symbols-outlined text-[14px] text-secondary">room</span>
+                                        BLDG-A 104
+                                    </div>
+</div>
+</div>
+<!-- Tuesday 08:00 (Empty) -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors cursor-pointer group flex items-center justify-center">
+<span class="material-symbols-outlined text-outline-variant/40 group-hover:text-primary/60 transition-colors">add</span>
+</div>
+<!-- Wednesday 08:00 (Unassigned) -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/50 transition-colors cursor-pointer p-1">
+<div class="h-full border-l-[4px] border-l-outline bg-surface p-2 flex flex-col gap-1 border border-outline-variant/20 rounded shadow-sm">
+<div class="flex justify-between items-start">
+<span class="font-data-tabular text-data-tabular font-medium text-ink">CS-101</span>
+<span class="font-label-caps text-label-caps bg-surface-variant text-on-surface-variant px-1 rounded">TUT</span>
+</div>
+<span class="font-body-sm text-label-caps text-secondary truncate">T.A. Lovelace</span>
+<div class="mt-auto flex items-center gap-1 font-data-tabular text-[12px] text-secondary pt-1 border-t border-outline-variant/20 italic">
+                                        No room assigned
+                                    </div>
+</div>
+</div>
+<!-- Thursday 08:00 (Empty) -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors cursor-pointer"></div>
+<!-- Friday 08:00 (Manually Locked) -->
+<div class="p-2 hover:bg-surface-container/50 transition-colors cursor-pointer p-1">
+<div class="h-full border-l-[4px] border-l-primary bg-primary/5 p-2 flex flex-col gap-1 border border-primary/20 rounded shadow-sm">
+<div class="flex justify-between items-start">
+<span class="font-data-tabular text-data-tabular font-medium text-ink">MATH-201</span>
+<span class="material-symbols-outlined text-[14px] text-primary">lock</span>
+</div>
+<span class="font-body-sm text-label-caps text-secondary truncate">Dr. Euler</span>
+<div class="mt-auto flex items-center gap-1 font-data-tabular text-[12px] text-ink pt-1 border-t border-outline-variant/20">
+<span class="material-symbols-outlined text-[14px] text-secondary">room</span>
+                                        HALL-B 200
+                                    </div>
+</div>
+</div>
+</div>
+<!-- 09:00 Row -->
+<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] border-b border-outline-variant/20 min-h-[100px]">
+<div class="p-3 border-r border-outline-variant/20 font-data-tabular text-data-tabular text-secondary flex items-start justify-center pt-4 bg-surface/50">09:00</div>
+<!-- Monday 09:00 (Conflict) -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/50 transition-colors cursor-pointer p-1 bg-error-container/10">
+<div class="h-full border-l-[4px] border-l-conflict-red bg-surface p-2 flex flex-col gap-1 border border-conflict-red/30 rounded shadow-sm">
+<div class="flex justify-between items-start">
+<span class="font-data-tabular text-data-tabular font-medium text-ink">CS-301</span>
+<span class="material-symbols-outlined text-[16px] text-conflict-red">warning</span>
+</div>
+<span class="font-body-sm text-label-caps text-secondary truncate">Dr. Smith</span>
+<div class="mt-auto flex items-center gap-1 font-data-tabular text-[12px] text-conflict-red pt-1 border-t border-conflict-red/20">
+                                        LAB-C 10 (CAP: 45)
+                                    </div>
+</div>
+</div>
+<!-- Filler Empty Cells -->
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 hover:bg-surface-container/30 transition-colors"></div>
+</div>
+<!-- Additional Rows (Abbreviated for demonstration) -->
+<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] border-b border-outline-variant/20 min-h-[100px]">
+<div class="p-3 border-r border-outline-variant/20 font-data-tabular text-data-tabular text-secondary flex items-start justify-center pt-4 bg-surface/50">10:00</div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 border-r border-outline-variant/20 hover:bg-surface-container/30 transition-colors"></div>
+<div class="p-2 hover:bg-surface-container/30 transition-colors"></div>
+</div>
+</div>
+</div>
+<!-- Status Legend -->
+<div class="flex items-center gap-6 py-2 px-4 bg-paper border border-outline-variant/20 rounded-lg shrink-0 overflow-x-auto">
+<span class="font-headline-md text-[13px] text-secondary uppercase tracking-wide mr-2">Legend:</span>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-outline"></div>
+<span class="font-body-sm text-body-sm text-ink">Unassigned</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-confirm-green"></div>
+<span class="font-body-sm text-body-sm text-ink">Auto-assigned</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="font-body-sm text-body-sm text-ink">Manually locked</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-conflict-red"></div>
+<span class="font-body-sm text-body-sm text-ink">Conflict</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

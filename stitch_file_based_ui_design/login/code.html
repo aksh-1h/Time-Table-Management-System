@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login - Timetable Room Assignment</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter and IBM Plex Sans Condensed -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#121c2c",
+                    "inverse-surface": "#293041",
+                    "surface-container-high": "#e1e8fe",
+                    "on-error-container": "#93000a",
+                    "on-primary-fixed-variant": "#0036bb",
+                    "tertiary": "#9b3400",
+                    "on-secondary": "#ffffff",
+                    "confirm-green": "#1E9E6B",
+                    "secondary-fixed": "#d9e2fa",
+                    "on-tertiary-fixed-variant": "#802a00",
+                    "on-surface": "#141b2b",
+                    "inverse-on-surface": "#edf0ff",
+                    "secondary-container": "#d9e2fa",
+                    "conflict-red": "#E5484D",
+                    "background": "#faf9ff",
+                    "inverse-primary": "#b8c4ff",
+                    "tertiary-fixed": "#ffdbcf",
+                    "primary": "#0043e1",
+                    "on-tertiary-fixed": "#380d00",
+                    "outline-variant": "#c4c5d9",
+                    "surface-container": "#e9edff",
+                    "on-primary-container": "#f3f2ff",
+                    "on-tertiary-container": "#fff0ec",
+                    "error": "#ba1a1a",
+                    "on-surface-variant": "#434656",
+                    "on-secondary-container": "#5b6478",
+                    "on-background": "#141b2b",
+                    "surface-tint": "#0e4bee",
+                    "on-primary-fixed": "#001354",
+                    "secondary-fixed-dim": "#bdc6dd",
+                    "on-secondary-fixed-variant": "#3e475a",
+                    "primary-container": "#2f5eff",
+                    "tertiary-container": "#c44400",
+                    "outline": "#747687",
+                    "surface-dim": "#d3daef",
+                    "surface": "#faf9ff",
+                    "on-primary": "#ffffff",
+                    "secondary": "#555e72",
+                    "surface-variant": "#dce2f8",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#dce2f8",
+                    "error-container": "#ffdad6",
+                    "ink": "#1C2333",
+                    "paper": "#FAFBFC",
+                    "primary-fixed": "#dde1ff",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#faf9ff",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb59a",
+                    "primary-fixed-dim": "#b8c4ff",
+                    "surface-container-low": "#f1f3ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "stack-gap": "1.5rem",
+                    "container-max": "1440px",
+                    "cell-padding": "0.75rem",
+                    "sidebar-width": "240px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "data-tabular": ["IBM Plex Mono"],
+                    "headline-lg": ["IBM Plex Sans Condensed"],
+                    "headline-md": ["IBM Plex Sans Condensed"]
+            },
+            "fontSize": {
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-md": ["15px", {"lineHeight": "22px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "data-tabular": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "400"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-md": ["18px", {"lineHeight": "24px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        /* Custom input focus ring to match the "no glow" guideline */
+        input:focus {
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body class="bg-paper min-h-screen flex items-center justify-center p-4 antialiased text-on-surface font-body-md">
+<!-- Auth Container -->
+<div class="w-full max-w-[420px] bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-8 shadow-[0_2px_4px_rgba(28,35,51,0.05)] relative overflow-hidden">
+<!-- Subtle top border accent for structure -->
+<div class="absolute top-0 left-0 w-full h-[2px] bg-primary"></div>
+<!-- Header / Identity -->
+<div class="flex flex-col items-center mb-8">
+<div class="w-16 h-16 rounded-DEFAULT bg-surface-container border border-outline-variant/20 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface text-center mb-1 tracking-tight" id="form-title">Parul University</h1>
+<p class="font-body-sm text-body-sm text-secondary text-center uppercase tracking-wider text-[11px] font-semibold">Faculty of Pharmacy • Scheduler Pro</p>
+</div>
+<!-- Login View -->
+<form class="flex flex-col gap-5 transition-opacity duration-300 opacity-100" id="view-login">
+<!-- Email Field -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-caps text-label-caps text-secondary" for="email">EMAIL ADDRESS</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary/60 text-[20px] pointer-events-none">mail</span>
+<input class="w-full h-10 pl-10 pr-3 border border-outline-variant/50 rounded-DEFAULT bg-transparent text-on-surface placeholder-secondary/50 focus:border-primary focus:border-2 transition-all font-body-md" id="email" placeholder="coordinator@paruluniversity.ac.in" required="" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-end">
+<label class="font-label-caps text-label-caps text-secondary" for="password">PASSWORD</label>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary/60 text-[20px] pointer-events-none">lock</span>
+<input class="w-full h-10 pl-10 pr-3 border border-outline-variant/50 rounded-DEFAULT bg-transparent text-on-surface placeholder-secondary/50 focus:border-primary focus:border-2 transition-all font-body-md" id="password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<!-- Options -->
+<div class="flex items-center justify-between mt-1">
+<label class="flex items-center gap-2 cursor-pointer group">
+<div class="relative flex items-center justify-center">
+<input class="peer appearance-none w-4 h-4 border border-outline-variant/50 rounded-[2px] bg-transparent checked:bg-primary checked:border-primary transition-colors cursor-pointer" type="checkbox"/>
+<span class="material-symbols-outlined absolute text-on-primary text-[14px] pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="font-body-sm text-body-sm text-secondary group-hover:text-on-surface transition-colors">Remember me</span>
+</label>
+<button class="font-body-sm text-body-sm text-primary hover:text-on-primary-fixed-variant transition-colors hover:underline underline-offset-2" id="trigger-forgot" type="button">
+                    Forgot password?
+                </button>
+</div>
+<!-- Action -->
+<button class="w-full h-10 mt-2 bg-primary text-on-primary rounded-DEFAULT font-body-md font-medium hover:bg-on-primary-fixed-variant active:bg-on-primary-fixed transition-colors flex items-center justify-center gap-2" type="submit">
+                Log in
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</form>
+<!-- Forgot Password View (Hidden by default) -->
+<form class="hidden flex-col gap-5 transition-opacity duration-300 opacity-0 absolute top-0 left-0 w-full h-full p-8 bg-surface-container-lowest" id="view-forgot">
+<div class="flex flex-col items-center mb-2 mt-4">
+<div class="w-12 h-12 rounded-full bg-surface-container border border-outline-variant/20 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-primary text-2xl">key</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface text-center mb-2">Reset Password</h2>
+<p class="font-body-sm text-body-sm text-secondary text-center leading-relaxed">
+                    Enter your institutional email address and we'll send you instructions to reset your password.
+                </p>
+</div>
+<div class="flex flex-col gap-1.5 mt-2">
+<label class="font-label-caps text-label-caps text-secondary" for="reset-email">EMAIL ADDRESS</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary/60 text-[20px] pointer-events-none">mail</span>
+<input class="w-full h-10 pl-10 pr-3 border border-outline-variant/50 rounded-DEFAULT bg-transparent text-on-surface placeholder-secondary/50 focus:border-primary focus:border-2 transition-all font-body-md" id="reset-email" placeholder="coordinator@paruluniversity.ac.in" required="" type="email"/>
+</div>
+</div>
+<div class="flex flex-col gap-3 mt-4">
+<button class="w-full h-10 bg-primary text-on-primary rounded-DEFAULT font-body-md font-medium hover:bg-on-primary-fixed-variant active:bg-on-primary-fixed transition-colors flex items-center justify-center gap-2" type="submit">
+                    Send Reset Link
+                    <span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+<button class="w-full h-10 bg-transparent border border-outline-variant/40 text-on-surface rounded-DEFAULT font-body-md font-medium hover:bg-surface-container/50 transition-colors flex items-center justify-center gap-2" id="trigger-login" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                    Back to log in
+                </button>
+</div>
+</form>
+</div>
+<!-- UI Logic -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const viewLogin = document.getElementById('view-login');
+            const viewForgot = document.getElementById('view-forgot');
+            const triggerForgot = document.getElementById('trigger-forgot');
+            const triggerLogin = document.getElementById('trigger-login');
+            const mainTitle = document.getElementById('form-title');
+            const mainSubtitle = mainTitle.nextElementSibling;
+            const headerIcon = mainTitle.previousElementSibling;
+
+            function switchView(hideView, showView, isForgotContext) {
+                // Fade out
+                hideView.style.opacity = '0';
+                
+                setTimeout(() => {
+                    hideView.classList.add('hidden');
+                    hideView.classList.remove('flex');
+                    
+                    showView.classList.remove('hidden');
+                    showView.classList.add('flex');
+                    
+                    // Force reflow
+                    void showView.offsetWidth; 
+                    
+                    // Fade in
+                    showView.style.opacity = '1';
+
+                    // Update header if returning to login
+                    if (!isForgotContext) {
+                        mainTitle.style.opacity = '1';
+                        mainSubtitle.style.opacity = '1';
+                        headerIcon.style.opacity = '1';
+                    } else {
+                        mainTitle.style.opacity = '0';
+                        mainSubtitle.style.opacity = '0';
+                        headerIcon.style.opacity = '0';
+                    }
+                }, 300); // Matches Tailwind transition duration
+            }
+
+            triggerForgot.addEventListener('click', () => {
+                switchView(viewLogin, viewForgot, true);
+            });
+
+            triggerLogin.addEventListener('click', () => {
+                switchView(viewForgot, viewLogin, false);
+            });
+            
+            // Prevent actual form submission for demo
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', (e) => e.preventDefault());
+            });
+        });
+    </script>
+</body></html>

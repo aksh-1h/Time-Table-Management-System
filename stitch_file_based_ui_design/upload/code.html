@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Upload Timetable - Scheduler Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=IBM+Plex+Sans+Condensed:wght@600&amp;family=IBM+Plex+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary-fixed": "#121c2c",
+                    "inverse-surface": "#293041",
+                    "surface-container-high": "#e1e8fe",
+                    "on-error-container": "#93000a",
+                    "on-primary-fixed-variant": "#0036bb",
+                    "tertiary": "#9b3400",
+                    "on-secondary": "#ffffff",
+                    "confirm-green": "#1E9E6B",
+                    "secondary-fixed": "#d9e2fa",
+                    "on-tertiary-fixed-variant": "#802a00",
+                    "on-surface": "#141b2b",
+                    "inverse-on-surface": "#edf0ff",
+                    "secondary-container": "#d9e2fa",
+                    "conflict-red": "#E5484D",
+                    "background": "#faf9ff",
+                    "inverse-primary": "#b8c4ff",
+                    "tertiary-fixed": "#ffdbcf",
+                    "primary": "#0043e1",
+                    "on-tertiary-fixed": "#380d00",
+                    "outline-variant": "#c4c5d9",
+                    "surface-container": "#e9edff",
+                    "on-primary-container": "#f3f2ff",
+                    "on-tertiary-container": "#fff0ec",
+                    "error": "#ba1a1a",
+                    "on-surface-variant": "#434656",
+                    "on-secondary-container": "#5b6478",
+                    "on-background": "#141b2b",
+                    "surface-tint": "#0e4bee",
+                    "on-primary-fixed": "#001354",
+                    "secondary-fixed-dim": "#bdc6dd",
+                    "on-secondary-fixed-variant": "#3e475a",
+                    "primary-container": "#2f5eff",
+                    "tertiary-container": "#c44400",
+                    "outline": "#747687",
+                    "surface-dim": "#d3daef",
+                    "surface": "#faf9ff",
+                    "on-primary": "#ffffff",
+                    "secondary": "#555e72",
+                    "surface-variant": "#dce2f8",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#dce2f8",
+                    "error-container": "#ffdad6",
+                    "ink": "#1C2333",
+                    "paper": "#FAFBFC",
+                    "primary-fixed": "#dde1ff",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#faf9ff",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb59a",
+                    "primary-fixed-dim": "#b8c4ff",
+                    "surface-container-low": "#f1f3ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "stack-gap": "1.5rem",
+                    "container-max": "1440px",
+                    "cell-padding": "0.75rem",
+                    "sidebar-width": "240px"
+            },
+            "fontFamily": {
+                    "body-sm": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "label-caps": [
+                            "Inter"
+                    ],
+                    "data-tabular": [
+                            "IBM Plex Mono"
+                    ],
+                    "headline-lg": [
+                            "IBM Plex Sans Condensed"
+                    ],
+                    "headline-md": [
+                            "IBM Plex Sans Condensed"
+                    ]
+            },
+            "fontSize": {
+                    "body-sm": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "15px",
+                            {
+                                    "lineHeight": "22px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-caps": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "data-tabular": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+        },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md h-screen w-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-sidebar-width bg-paper dark:bg-inverse-surface border-r border-outline-variant/20 flex flex-col py-gutter px-3 z-20">
+<div class="mb-8 px-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined fill text-2xl">school</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary leading-tight tracking-tight">Scheduler Pro</h1>
+<p class="font-body-sm text-body-sm text-secondary">Admin Portal</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 flex-grow">
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="cloud_upload">cloud_upload</span>
+<span>Upload</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="meeting_room">meeting_room</span>
+<span>Rooms</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span>Timetable &amp; Assignment</span>
+</a>
+</div>
+<div class="mt-auto flex flex-col gap-1 border-t border-outline-variant/20 pt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span>Profile</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width flex-1 flex flex-col h-screen overflow-hidden bg-background">
+<!-- TopNavBar (Simplified for this view as per prompt, but maintaining structural consistency) -->
+<header class="flex justify-between items-center h-16 px-gutter border-b border-outline-variant/20 bg-surface w-full z-10 shrink-0">
+<div class="flex items-center gap-6">
+<!-- Navigation links from JSON, active state not applicable here but showing inactive -->
+<nav class="hidden md:flex gap-6 h-full items-center">
+<a class="text-on-surface-variant font-headline-md text-headline-md hover:text-primary transition-colors h-full flex items-center" href="#">Semester Fall 2024</a>
+<a class="text-on-surface-variant font-headline-md text-headline-md hover:text-primary transition-colors h-full flex items-center" href="#">Main Campus</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant/20 overflow-hidden">
+<img alt="Coordinator Avatar" class="w-full h-full object-cover" data-alt="A small, professional headshot photo of a university administrator in a modern office setting. Light mode aesthetic, sharp focus, neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhEto0EaFuplaG_prSSx03HN656KvsUksyf8guvi9Xaffg9KByUbtbo_ser5PoeRnCzQKQnVXCOBUYKOXFJMZzc9DdnYiklFdIw3VUr1lAuz1Q6BXdeZWQYooX0jFXms4j0fo0aV4J0d206DXSAn5-US2Fl_6qC53GdkcYHS5fGUqWCA-eINSlxKKV67v5HlElTxghnrZxuw_RcxIvI_4Fj2lhpYUGqTafu7sWkP7P517lSVWZDZ4sxo_yYbbePjHW1MYno34pIgKS"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="flex-1 p-stack-gap overflow-y-auto flex flex-col items-center justify-center max-w-container-max mx-auto w-full">
+<div class="w-full max-w-3xl flex flex-col gap-6">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Upload Timetable</h2>
+<p class="font-body-md text-body-md text-secondary">Upload a PDF containing the semester schedule to automatically extract and process assignments.</p>
+</div>
+<!-- Drop Zone -->
+<div class="border-2 border-dashed border-outline-variant hover:border-primary/50 bg-paper hover:bg-surface-container-low transition-all duration-200 rounded-xl p-12 flex flex-col items-center justify-center text-center cursor-pointer group relative" id="drop-zone">
+<input accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" id="file-upload" type="file"/>
+<div class="w-16 h-16 rounded-full bg-surface-variant group-hover:bg-primary-container/20 flex items-center justify-center mb-6 transition-colors duration-200">
+<span class="material-symbols-outlined text-4xl text-secondary group-hover:text-primary transition-colors duration-200" data-icon="upload_file">upload_file</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-2 group-hover:text-primary transition-colors duration-200">Drop PDF here or click to browse</h3>
+<p class="font-body-sm text-body-sm text-secondary">Supported format: .pdf (Max size: 10MB)</p>
+</div>
+<!-- Processing State (Mocked as already completed based on prompt) -->
+<div class="bg-paper border border-outline-variant/20 rounded-lg p-4 flex items-start gap-4">
+<div class="w-8 h-8 rounded-full bg-confirm-green/10 flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-confirm-green text-lg font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<p class="font-body-md text-body-md text-on-surface font-medium mb-1">42 slots imported for Division A, Semester 7</p>
+<p class="font-body-sm text-body-sm text-secondary">Data successfully extracted. Ready for room assignment matrix.</p>
+</div>
+<button class="px-4 py-2 bg-primary text-on-primary rounded hover:bg-primary/90 active:bg-primary/80 transition-colors font-body-sm text-body-sm shrink-0">
+                        View Matrix
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple drag and drop visual feedback
+        const dropZone = document.getElementById('drop-zone');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('border-primary', 'bg-surface-container-low');
+            dropZone.classList.remove('border-outline-variant', 'bg-paper');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('border-primary', 'bg-surface-container-low');
+            dropZone.classList.add('border-outline-variant', 'bg-paper');
+        }
+    </script>
+</body></html>

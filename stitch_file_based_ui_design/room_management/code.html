@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Room Management - Scheduler Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=IBM+Plex+Mono:wght@400&amp;family=IBM+Plex+Sans+Condensed:wght@600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#121c2c",
+                      "inverse-surface": "#293041",
+                      "surface-container-high": "#e1e8fe",
+                      "on-error-container": "#93000a",
+                      "on-primary-fixed-variant": "#0036bb",
+                      "tertiary": "#9b3400",
+                      "on-secondary": "#ffffff",
+                      "confirm-green": "#1E9E6B",
+                      "secondary-fixed": "#d9e2fa",
+                      "on-tertiary-fixed-variant": "#802a00",
+                      "on-surface": "#141b2b",
+                      "inverse-on-surface": "#edf0ff",
+                      "secondary-container": "#d9e2fa",
+                      "conflict-red": "#E5484D",
+                      "background": "#faf9ff",
+                      "inverse-primary": "#b8c4ff",
+                      "tertiary-fixed": "#ffdbcf",
+                      "primary": "#0043e1",
+                      "on-tertiary-fixed": "#380d00",
+                      "outline-variant": "#c4c5d9",
+                      "surface-container": "#e9edff",
+                      "on-primary-container": "#f3f2ff",
+                      "on-tertiary-container": "#fff0ec",
+                      "error": "#ba1a1a",
+                      "on-surface-variant": "#434656",
+                      "on-secondary-container": "#5b6478",
+                      "on-background": "#141b2b",
+                      "surface-tint": "#0e4bee",
+                      "on-primary-fixed": "#001354",
+                      "secondary-fixed-dim": "#bdc6dd",
+                      "on-secondary-fixed-variant": "#3e475a",
+                      "primary-container": "#2f5eff",
+                      "tertiary-container": "#c44400",
+                      "outline": "#747687",
+                      "surface-dim": "#d3daef",
+                      "surface": "#faf9ff",
+                      "on-primary": "#ffffff",
+                      "secondary": "#555e72",
+                      "surface-variant": "#dce2f8",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-highest": "#dce2f8",
+                      "error-container": "#ffdad6",
+                      "ink": "#1C2333",
+                      "paper": "#FAFBFC",
+                      "primary-fixed": "#dde1ff",
+                      "on-tertiary": "#ffffff",
+                      "surface-bright": "#faf9ff",
+                      "on-error": "#ffffff",
+                      "tertiary-fixed-dim": "#ffb59a",
+                      "primary-fixed-dim": "#b8c4ff",
+                      "surface-container-low": "#f1f3ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "1rem",
+                      "stack-gap": "1.5rem",
+                      "container-max": "1440px",
+                      "cell-padding": "0.75rem",
+                      "sidebar-width": "240px"
+              },
+              "fontFamily": {
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Inter"
+                      ],
+                      "data-tabular": [
+                              "IBM Plex Mono"
+                      ],
+                      "headline-lg": [
+                              "IBM Plex Sans Condensed"
+                      ],
+                      "headline-md": [
+                              "IBM Plex Sans Condensed"
+                      ]
+              },
+              "fontSize": {
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "15px",
+                              {
+                                      "lineHeight": "22px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "data-tabular": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        /* Custom scrollbar for data density feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FAFBFC; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c4c5d9; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #747687; 
+        }
+        
+        /* Table row hover subtle highlight */
+        .table-row-hover:hover {
+            background-color: #f1f3ff;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-paper dark:bg-inverse-surface fixed left-0 top-0 h-screen w-sidebar-width border-r border-outline-variant/20 flex flex-col py-gutter px-3 z-50">
+<!-- Header -->
+<div class="mb-8 px-2 flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container">event</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary tracking-tight">Scheduler Pro</h1>
+<p class="font-body-sm text-body-sm text-secondary">Admin Portal</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<ul class="flex flex-col gap-1 flex-grow">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="cloud_upload">cloud_upload</span>
+<span>Upload</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="meeting_room" data-weight="fill" style="font-variation-settings: 'FILL' 1;">meeting_room</span>
+<span class="font-semibold">Rooms</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-lg active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span>Timetable &amp; Assignment</span>
+</a>
+</li>
+</ul>
+<!-- Footer Links -->
+<ul class="flex flex-col gap-1 mt-auto pt-4 border-t border-outline-variant/20">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span>Profile</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="ml-sidebar-width flex flex-col flex-1 h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-container-lowest docked full-width top-0 border-b border-outline-variant/20 z-40">
+<div class="flex justify-between items-center h-16 px-gutter max-w-container-max mx-auto w-full">
+<!-- Left Nav Links -->
+<div class="flex items-center gap-6 h-full">
+<a class="text-on-surface-variant hover:text-primary transition-colors active:opacity-80 font-body-sm text-body-sm flex items-center h-full" href="#">Semester Fall 2024</a>
+<a class="text-primary border-b-2 border-primary pb-1 hover:text-primary transition-colors active:opacity-80 font-body-sm text-body-sm font-semibold flex items-center h-full mt-1" href="#">Main Campus</a>
+</div>
+<!-- Right Actions -->
+<div class="flex items-center gap-4">
+<button class="font-body-sm text-body-sm text-secondary hover:text-on-surface border border-outline-variant/20 px-3 py-1.5 rounded transition-colors active:opacity-80 bg-paper hover:bg-surface-container">Export PDF</button>
+<button class="font-body-sm text-body-sm bg-primary text-on-primary px-4 py-1.5 rounded transition-colors hover:bg-primary-container active:bg-on-primary-fixed-variant">Upload Timetable</button>
+<div class="w-px h-6 bg-outline-variant/30 mx-1"></div>
+<button class="text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-secondary hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<img alt="Coordinator Avatar" class="w-8 h-8 rounded-full ml-2 border border-outline-variant/30 object-cover" data-alt="A small, professional headshot avatar of a university coordinator, well-lit against a neutral background, conveying competence and calm authority, matching a modern light-mode admin interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC45eAks-GKcmNZgjuSjzlOLHO9er8nT4MWf7ecZJdzbW8YSqTdrUY_FFzX8arYPnb2A4TtYqnO9HVzzRL2fjQ7WQH51eHdVzSrHQeayCrV-oRnH_HGLeI8N3EhT4jOOMViSJMQo6bK2rA9kCBAy4kTmaPdOOrT2knXRHC5EJuBCud3Q1bDvE63JIOhPsFpVXhXGL860ugZ0FmDM5os4mkRp2GO0DQZ-1QPJQTYitqD3JA-RE3ohkE1QLZA4GswwJ9b8FYB8SsmHqb6"/>
+</div>
+</div>
+</header>
+<!-- Canvas Area -->
+<main class="flex-1 overflow-auto p-gutter bg-background">
+<div class="max-w-container-max mx-auto flex flex-col h-full gap-stack-gap">
+<!-- Page Header & Actions -->
+<div class="flex items-end justify-between shrink-0 pt-2">
+<div>
+<h2 class="font-headline-lg text-headline-lg font-bold text-ink">Rooms</h2>
+<p class="font-body-sm text-body-sm text-secondary mt-1">Manage physical spaces, capacities, and capabilities.</p>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-sm">search</span>
+<input class="pl-9 pr-3 py-1.5 bg-paper border border-outline-variant/50 rounded font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-64 placeholder:text-secondary/60" placeholder="Search rooms..." type="text"/>
+</div>
+<button class="flex items-center gap-2 bg-primary text-on-primary px-4 py-1.5 rounded font-body-sm text-body-sm hover:bg-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                            Add Room
+                        </button>
+</div>
+</div>
+<!-- Filters -->
+<div class="flex gap-2 shrink-0 border-b border-outline-variant/20 pb-4">
+<button class="px-3 py-1 rounded bg-secondary-container text-on-secondary-fixed font-label-caps text-label-caps tracking-wider border border-transparent">ALL ROOMS</button>
+<button class="px-3 py-1 rounded bg-paper text-secondary hover:bg-surface-container font-label-caps text-label-caps tracking-wider border border-outline-variant/20">LECTURE HALLS</button>
+<button class="px-3 py-1 rounded bg-paper text-secondary hover:bg-surface-container font-label-caps text-label-caps tracking-wider border border-outline-variant/20">LABS</button>
+<button class="px-3 py-1 rounded bg-paper text-secondary hover:bg-surface-container font-label-caps text-label-caps tracking-wider border border-outline-variant/20">SEMINAR</button>
+</div>
+<!-- Data Table Card -->
+<div class="bg-paper border border-outline-variant/20 rounded-lg flex-1 flex flex-col overflow-hidden shadow-[0_2px_4px_rgba(28,35,51,0.02)]">
+<div class="overflow-auto flex-1">
+<table class="w-full text-left border-collapse">
+<thead class="sticky top-0 bg-paper z-10 border-b border-outline-variant/30">
+<tr>
+<th class="py-3 px-4 font-headline-md text-[13px] font-semibold text-secondary uppercase tracking-wider w-32">Room No</th>
+<th class="py-3 px-4 font-headline-md text-[13px] font-semibold text-secondary uppercase tracking-wider w-48">Category</th>
+<th class="py-3 px-4 font-headline-md text-[13px] font-semibold text-secondary uppercase tracking-wider w-32">Capacity</th>
+<th class="py-3 px-4 font-headline-md text-[13px] font-semibold text-secondary uppercase tracking-wider">Features</th>
+<th class="py-3 px-4 font-headline-md text-[13px] font-semibold text-secondary uppercase tracking-wider w-24 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm divide-y divide-outline-variant/10">
+<!-- Row 1 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">B1-101</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-caps text-[10px]">LECTURE HALL</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">150</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">Projector, Smartboard, Audio</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">C2-405</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-[#e6f4ea] text-[#137333] font-label-caps text-[10px]">COMPUTER LAB</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">40</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">40x Win PCs, Whiteboard</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">A1-212</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-label-caps text-[10px]">CHEMISTRY LAB</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">24</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">Fume Hoods, Gas Lines</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">B1-102</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-label-caps text-[10px]">LECTURE HALL</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">120</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">Projector, Whiteboard</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">L-G01</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-[#fce8e6] text-[#c5221f] font-label-caps text-[10px]">AUDITORIUM</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">450</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">Dual Projectors, PA System, Stage</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="table-row-hover group transition-colors">
+<td class="py-cell-padding px-4 font-data-tabular text-data-tabular font-medium text-ink">S-305</td>
+<td class="py-cell-padding px-4">
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-[#fef7e0] text-[#e67c73] font-label-caps text-[10px]">SEMINAR ROOM</span>
+</td>
+<td class="py-cell-padding px-4 text-on-surface-variant">15</td>
+<td class="py-cell-padding px-4 text-secondary text-sm">Monitor, Whiteboard, Polycom</td>
+<td class="py-cell-padding px-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="text-secondary hover:text-conflict-red"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="bg-surface border-t border-outline-variant/20 p-3 flex items-center justify-between shrink-0">
+<span class="text-sm text-secondary font-body-sm">Showing 1 to 6 of 142 rooms</span>
+<div class="flex gap-1">
+<button class="p-1 text-secondary hover:bg-surface-container rounded disabled:opacity-50" disabled=""><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+<button class="p-1 text-secondary hover:bg-surface-container rounded"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
