@@ -165,17 +165,20 @@ slotA.start_time < slotB.end_time  AND  slotB.start_time < slotA.end_time
 
 This interval-overlap check is used everywhere clash detection happens — both in the bulk algorithm and in manual-edit validation.
 
-### 7.3 Assignment Logic (per day, per overlapping time window)
+### 7.3 Assignment Logic — Lab-First, Reuse-Room Priority
 
-1. Build the set of slots needing a room within a given day+overlapping-time window, having already applied category + capacity filtering per slot (7.1).
-2. Exclude rooms already occupied in that window by:
-   - slots with `manually_assigned = true` (locked — see 7.4), and
-   - slots already auto-assigned earlier in this same run.
-3. Assign remaining eligible rooms to remaining slots:
-   - **Greedy assignment** as the default (sort slots, sort candidate rooms, assign first available match) — sufficient at this scale (rooms in the dozens, classes in the tens per slot).
-   - **Bipartite matching** (simple augmenting-path, no external solver library needed) as a fallback if greedy fails to find a valid full assignment even though one exists — this specifically resolves cases like "two labs, same capacity, algorithm needs to pick correctly between them" rather than greedy's simpler first-fit potentially blocking a valid overall solution.
-4. **Optional consistency pass:** before falling back to greedy/matching, try to reuse the *same* room previously assigned to a given `batch + subject` combination across the week, so students aren't sent to a different room for the same recurring class on different days.
-5. If a window has more eligible slots than eligible rooms (a genuine shortage), the affected slots are left with `room_id = null` and are flagged/red-highlighted in the UI — not a bug, a real scheduling conflict requiring human attention.
+**CRITICAL RULE: Labs are sacred. Never reassign lab rooms.**
+
+Labs have HIGHER priority than classrooms. Lab rooms are permanently fixed to their subjects as defined in the room dataset. The algorithm must NEVER move a lab to a different room. Only theory/classroom assignments are flexible.
+
+**Algorithm Priority Order:**
+
+1. **Labs → Fixed assignment:** Lab rooms are assigned exactly as the dataset specifies (`rooms` table, category = `*_lab`). These are immutable — they are pre-assigned before the algorithm runs and are never included in the candidate pool for reassignment.
+2. **Theory classrooms → Reuse-first:** Before assigning a new classroom to a theory slot, check where this `batch + subject` combination was previously held (earlier in the same semester, or in a prior run) and assign the SAME room. Only change if a time-overlap conflict makes it impossible.
+3. **Fallback:** If the same room is unavailable (conflict), then and ONLY then assign an alternative classroom from the eligible pool using:
+   - Greedy assignment (sort slots, sort candidate rooms, assign first available match) — sufficient at this scale.
+   - Bipartite matching (simple augmenting-path) as fallback if greedy fails.
+4. If a window has more eligible slots than eligible rooms (a genuine shortage), the affected slots are left with `room_id = null` and are flagged/red-highlighted in the UI — not a bug, a real scheduling conflict requiring human attention.
 
 ### 7.4 Locking — Two Distinct Mechanisms
 
