@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
-import { parseFacultySubjectsData } from '../../lib/data-parser';
 
 // GET /api/subjects — List all subjects with optional filters
 export async function GET(request) {
   const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const program = searchParams.get('program');
   const semester = searchParams.get('semester');
@@ -12,76 +15,38 @@ export async function GET(request) {
   const specialization = searchParams.get('specialization');
   const withFaculty = searchParams.get('withFaculty') === 'true';
 
-  // ── Supabase mode ──
-  if (supabase) {
-    let query;
-
-    if (withFaculty) {
-      query = supabase
-        .from('subjects')
-        .select(`
-          *,
-          faculty_subject_assignments (
-            id,
-            division,
-            role,
-            faculty:faculty_id (
-              id,
-              name,
-              designation
-            )
-          )
-        `);
-    } else {
-      query = supabase.from('subjects').select('*');
-    }
-
-    if (program) query = query.eq('program', program);
-    if (semester) query = query.eq('semester', parseInt(semester));
-    if (classType) query = query.eq('class_type', classType);
-    if (specialization) query = query.eq('specialization', specialization);
-
-    query = query.order('program').order('semester').order('subject_code');
-
-    const { data, error } = await query;
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
-  }
-
-  // ── JSON fallback mode ──
-  const { faculties, subjects, assignments } = parseFacultySubjectsData();
-  
-  let result = subjects;
-  if (program) result = result.filter(s => s.program === program);
-  if (semester) result = result.filter(s => s.semester === parseInt(semester));
-  if (classType) result = result.filter(s => s.class_type === classType);
-  if (specialization) result = result.filter(s => s.specialization === specialization);
+  let query;
 
   if (withFaculty) {
-    result = result.map(s => {
-      const subjAssignments = assignments
-        .filter(a => a.subjectCode === s.subject_code && a.classType === s.class_type && a.program === s.program)
-        .map(a => {
-          const fac = faculties.find(f => f.name === a.facultyName);
-          return {
-            id: `asgn-${a.facultyName}-${s.subject_code}`,
-            division: a.division,
-            role: 'instructor',
-            faculty: fac || null,
-          };
-        });
-      return { ...s, faculty_subject_assignments: subjAssignments };
-    });
+    query = supabase
+      .from('subjects')
+      .select(`
+        *,
+        faculty_subject_assignments (
+          id,
+          division,
+          role,
+          faculty:faculty_id (
+            id,
+            name
+          )
+        )
+      `);
+  } else {
+    query = supabase.from('subjects').select('*');
   }
 
-  result.sort((a, b) => {
-    if (a.program !== b.program) return (a.program || '').localeCompare(b.program || '');
-    if (a.semester !== b.semester) return (a.semester || 0) - (b.semester || 0);
-    return (a.subject_code || '').localeCompare(b.subject_code || '');
-  });
+  if (program) query = query.eq('program', program);
+  if (semester) query = query.eq('semester', parseInt(semester));
+  if (classType) query = query.eq('class_type', classType);
+  if (specialization) query = query.eq('specialization', specialization);
 
-  return NextResponse.json(result);
+  query = query.order('program').order('semester').order('subject_code');
+
+  const { data, error } = await query;
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 // POST /api/subjects — Add a new subject (Supabase only)

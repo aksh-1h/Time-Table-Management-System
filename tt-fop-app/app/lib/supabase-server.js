@@ -13,7 +13,12 @@ export function createServerSupabaseClient() {
     return null; // Supabase not configured — caller should use JSON fallback
   }
 
-  return createClient(url, key);
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
 
 /**

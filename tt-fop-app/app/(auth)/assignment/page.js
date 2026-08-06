@@ -91,6 +91,7 @@ export default function AssignmentPage() {
   const [programs, setPrograms] = useState([]);
   const [divisions, setDivisions] = useState([]);
   const [semesters, setSemesters] = useState([]);
+  const [mpharmSpecializations, setMpharmSpecializations] = useState([]);
 
   useEffect(() => {
     fetch('/api/slots/options')
@@ -99,6 +100,7 @@ export default function AssignmentPage() {
         if (data.programs) setPrograms(data.programs);
         if (data.divisions) setDivisions(data.divisions);
         if (data.semesters) setSemesters(data.semesters);
+        if (data.mpharmSpecializations) setMpharmSpecializations(data.mpharmSpecializations);
         
         setFilterProgram(prev => prev || (data.programs?.[0] || ''));
         setFilterDivision(prev => prev || (data.divisions?.[0] || ''));
@@ -280,13 +282,26 @@ export default function AssignmentPage() {
           <p>
             Click any cell to manually assign or change rooms.{' '}
             {filteredSlots.length} slot{filteredSlots.length !== 1 ? 's' : ''}
-            {filterDivision ? ` · Div ${filterDivision}` : ''}
+            {filterProgram === 'B.Pharm' && filterDivision ? ` · Div ${filterDivision}` : ''}
+            {filterProgram === 'M.Pharm' && filterDivision ? ` · ${filterDivision}` : ''}
             {filterSemester ? ` · Sem ${filterSemester}` : ''}
             {' '}· 9:30 – 4:25 (Recess 12:30 – 1:30)
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select className="filter-select" value={filterProgram} onChange={e => { setFilterProgram(e.target.value); setFilterSemester('1'); setFilterDivision('A'); }}>
+          <select className="filter-select" value={filterProgram} onChange={e => {
+            const newProg = e.target.value;
+            setFilterProgram(newProg);
+            setFilterSemester('1');
+            if (newProg === 'M.Pharm') {
+              const specs = mpharmSpecializations.length > 0 ? mpharmSpecializations : ['Pharmaceutics'];
+              setFilterDivision(specs[0]);
+            } else if (newProg === 'Pharm D') {
+              setFilterDivision('A');
+            } else {
+              setFilterDivision('A');
+            }
+          }}>
             {programs.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <select className="filter-select" value={filterSemester} onChange={e => setFilterSemester(e.target.value)}>
@@ -298,9 +313,21 @@ export default function AssignmentPage() {
               <option key={s} value={s}>{filterProgram === 'Pharm D' ? `Year ${s}` : `Semester ${s}`}</option>
             ))}
           </select>
-          <select className="filter-select" value={filterDivision} onChange={e => setFilterDivision(e.target.value)}>
-            {divisions.map(d => <option key={d} value={d}>Division {d}</option>)}
-          </select>
+          {filterProgram === 'Pharm D' ? null : (
+            <select className="filter-select" value={filterDivision} onChange={e => setFilterDivision(e.target.value)}>
+              {filterProgram === 'M.Pharm' ? (
+                (mpharmSpecializations.length > 0 ? mpharmSpecializations : [
+                  'Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry',
+                  'Pharmacognosy', 'Quality Assurance', 'Industrial Pharmacy',
+                  'Pharmacy Practice', 'Regulatory Affairs', 'Clinical Research'
+                ]).map(spec => (
+                  <option key={spec} value={spec}>{spec}</option>
+                ))
+              ) : (
+                divisions.map(d => <option key={d} value={d}>Division {d}</option>)
+              )}
+            </select>
+          )}
           <select className="filter-select" value={filterDay} onChange={e => setFilterDay(e.target.value)}>
             <option value="">All Days</option>
             {DAYS.map(d => <option key={d} value={d}>{d}</option>)}

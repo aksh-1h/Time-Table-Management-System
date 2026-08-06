@@ -1,46 +1,37 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
-import { parseFacultySubjectsData } from '../../lib/data-parser';
 
 // GET /api/faculties — List all faculties, optionally with their subject assignments
 export async function GET(request) {
   const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const withSubjects = searchParams.get('withSubjects') === 'true';
 
-  // ── Supabase mode ──
-  if (supabase) {
-    if (withSubjects) {
-      const { data, error } = await supabase
-        .from('faculties')
-        .select(`
-          *,
-          faculty_subject_assignments (
-            id,
-            division,
-            role,
-            academic_year,
-            subjects:subject_id (
-              id,
-              subject_code,
-              subject_name,
-              program,
-              specialization,
-              semester,
-              class_type
-            )
-          )
-        `)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json(data);
-    }
-
+  if (withSubjects) {
     const { data, error } = await supabase
       .from('faculties')
-      .select('*')
+      .select(`
+        *,
+        faculty_subject_assignments (
+          id,
+          division,
+          role,
+          academic_year,
+          subjects:subject_id (
+            id,
+            subject_code,
+            subject_name,
+            program,
+            specialization,
+            semester,
+            class_type
+          )
+        )
+      `)
       .eq('is_active', true)
       .order('name');
 
@@ -48,30 +39,14 @@ export async function GET(request) {
     return NextResponse.json(data);
   }
 
-  // ── JSON fallback mode ──
-  const { faculties, subjects, assignments } = parseFacultySubjectsData();
+  const { data, error } = await supabase
+    .from('faculties')
+    .select('*')
+    .eq('is_active', true)
+    .order('name');
 
-  if (withSubjects) {
-    // Build faculty → assignments → subjects relationship
-    const result = faculties.map(f => {
-      const facAssignments = assignments
-        .filter(a => a.facultyName === f.name)
-        .map(a => {
-          const subj = subjects.find(s => s.subject_code === a.subjectCode && s.class_type === a.classType && s.program === a.program);
-          return {
-            id: `asgn-${f.name}-${a.subjectCode}`,
-            division: a.division,
-            role: 'instructor',
-            academic_year: '2026-27',
-            subjects: subj || null,
-          };
-        });
-      return { ...f, faculty_subject_assignments: facAssignments };
-    });
-    return NextResponse.json(result);
-  }
-
-  return NextResponse.json(faculties);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 // POST /api/faculties — Add a new faculty (Supabase only)
@@ -82,13 +57,13 @@ export async function POST(request) {
   }
 
   const body = await request.json();
-  const { name, designation } = body;
+  const { name } = body;
 
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
 
   const { data, error } = await supabase
     .from('faculties')
-    .insert({ name, designation: designation || null })
+    .insert({ name })
     .select()
     .single();
 

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
-import { parseRoomsData, parseFacultySubjectsData } from '../../lib/data-parser';
 
 /**
  * GET /api/stats — Aggregated dashboard statistics
@@ -8,39 +7,33 @@ import { parseRoomsData, parseFacultySubjectsData } from '../../lib/data-parser'
  */
 export async function GET() {
   const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+  }
 
   try {
-    // ── Supabase mode ──
-    if (supabase) {
-      const [
-        roomsRes, facultiesRes, subjectsRes, assignmentsRes,
-        slotsRes, slotAssignedRes, slotConflictsRes,
-      ] = await Promise.all([
-        supabase.from('rooms').select('id, category, program, is_active'),
-        supabase.from('faculties').select('id').eq('is_active', true),
-        supabase.from('subjects').select('id, program, class_type, specialization'),
-        supabase.from('faculty_subject_assignments').select('id'),
-        supabase.from('slot_assignments').select('id, room_id, manually_assigned'),
-        supabase.from('slot_assignments').select('id').not('room_id', 'is', null),
-        supabase.from('slot_assignments').select('id').is('room_id', null).eq('manually_assigned', false),
-      ]);
+    const [
+      roomsRes, facultiesRes, subjectsRes, assignmentsRes,
+      slotsRes, slotAssignedRes, slotConflictsRes,
+    ] = await Promise.all([
+      supabase.from('rooms').select('id, category, program, is_active'),
+      supabase.from('faculties').select('id').eq('is_active', true),
+      supabase.from('subjects').select('id, program, class_type, specialization'),
+      supabase.from('faculty_subject_assignments').select('id'),
+      supabase.from('timetable_entries').select('id, room'),
+      supabase.from('timetable_entries').select('id').not('room', 'is', null).neq('room', ''),
+      supabase.from('timetable_entries').select('id').or('room.is.null,room.eq.'),
+    ]);
 
-      const rooms = roomsRes.data || [];
-      const faculties = facultiesRes.data || [];
-      const subjects = subjectsRes.data || [];
-      const assignments = assignmentsRes.data || [];
-      const allSlots = slotsRes.data || [];
-      const assignedSlots = slotAssignedRes.data || [];
-      const unassignedSlots = slotConflictsRes.data || [];
+    const rooms = roomsRes.data || [];
+    const faculties = facultiesRes.data || [];
+    const subjects = subjectsRes.data || [];
+    const assignments = assignmentsRes.data || [];
+    const allSlots = slotsRes.data || [];
+    const assignedSlots = slotAssignedRes.data || [];
+    const unassignedSlots = slotConflictsRes.data || [];
 
-      return NextResponse.json(await computeStats(rooms, faculties, subjects, assignments, allSlots, assignedSlots, unassignedSlots, true, supabase));
-    }
-
-    // ── JSON fallback mode ──
-    const rooms = parseRoomsData();
-    const { faculties, subjects, assignments } = parseFacultySubjectsData();
-    // No slots available in offline mode yet (they come from PDF uploads)
-    return NextResponse.json(await computeStats(rooms, faculties, subjects, assignments, [], [], [], false));
+    return NextResponse.json(await computeStats(rooms, faculties, subjects, assignments, allSlots, assignedSlots, unassignedSlots, supabase));
 
   } catch (err) {
     console.error('[stats] Error:', err);
@@ -48,7 +41,7 @@ export async function GET() {
   }
 }
 
-async function computeStats(rooms, faculties, subjects, assignments, allSlots, assignedSlots, unassignedSlots, isSupabase, supabase) {
+async function computeStats(rooms, faculties, subjects, assignments, allSlots, assignedSlots, unassignedSlots, supabase) {
   const roomsByCategory = {};
   let classroomCount = 0;
   let labCount = 0;
@@ -64,19 +57,12 @@ async function computeStats(rooms, faculties, subjects, assignments, allSlots, a
   }
 
   let nfPendingCount = 0;
-  if (isSupabase && supabase) {
-    const subjectIdsWithFaculty = new Set();
-    const { data: assignedSubjectIds } = await supabase.from('faculty_subject_assignments').select('subject_id');
-    if (assignedSubjectIds) {
-      for (const a of assignedSubjectIds) subjectIdsWithFaculty.add(a.subject_id);
-    }
-    nfPendingCount = subjects.filter(s => !subjectIdsWithFaculty.has(s.id)).length;
-  } else {
-    // In JSON mode, assignments list contains exactly the successful parsing
-    // But our subjects list has unique subjects. Any subject not in assignments = NF pending.
-    const assignedSubjKeys = new Set(assignments.map(a => `${a.subjectCode}|${a.classType}|${a.program}|${a.specialization || ''}`));
-    nfPendingCount = subjects.filter(s => !assignedSubjKeys.has(`${s.subject_code}|${s.class_type}|${s.program}|${s.specialization || ''}`)).length;
+  const subjectIdsWithFaculty = new Set();
+  const { data: assignedSubjectIds } = await supabase.from('faculty_subject_assignments').select('subject_id');
+  if (assignedSubjectIds) {
+    for (const a of assignedSubjectIds) subjectIdsWithFaculty.add(a.subject_id);
   }
+  nfPendingCount = subjects.filter(s => !subjectIdsWithFaculty.has(s.id)).length;
 
   const totalSlots = allSlots.length;
   const assignedCount = assignedSlots.length;

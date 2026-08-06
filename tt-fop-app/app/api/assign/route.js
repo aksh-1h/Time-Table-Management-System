@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { parseRoomsData, parseFacultySubjectsData } from '../../lib/data-parser';
+import { createServerSupabaseClient } from '../../lib/supabase-server';
 import { getTheoryRoom, getLabRooms } from '../../lib/room-allocation-map';
 import { generateFullSchedule } from '../../lib/workload-generator';
 
@@ -100,6 +100,11 @@ function isGenericFaculty(name) {
  */
 export async function POST(request) {
   try {
+    const supabase = createServerSupabaseClient();
+    if (!supabase) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+
     const body = await request.json();
     const { scope } = body;
 
@@ -109,16 +114,16 @@ export async function POST(request) {
 
     const { programs, semesters, divisions = [] } = scope;
 
-    // Load all rooms for lookup
-    const allRooms = parseRoomsData();
+    // Load all rooms from Supabase for lookup
+    const { data: roomsData, error: roomsErr } = await supabase.from('rooms').select('*');
+    if (roomsErr) throw roomsErr;
+
+    const allRooms = roomsData || [];
     const roomsByNo = {};
     for (const r of allRooms) {
       roomsByNo[r.room_no] = r;
       roomsByNo[normRoom(r.room_no)] = r;
     }
-
-    // Load faculty/subject data
-    const { assignments: facultyAssignments } = parseFacultySubjectsData();
 
     // Clear auto-assignments for scope while preserving manual locks
     clearOccupancyForScope(programs, semesters.map(Number), divisions);
@@ -127,7 +132,6 @@ export async function POST(request) {
     // STEP 1: Generate all slots for scope by finding uploaded schedules
     // ─────────────────────────────────────────────────────────────
     const allSlots = [];
-    const supabase = require('../../lib/supabase-server').createServerSupabaseClient();
     let query = supabase.from('timetable_uploads').select('program, semester, division');
     
     if (programs && programs.length > 0) query = query.in('program', programs);
@@ -139,7 +143,7 @@ export async function POST(request) {
 
     if (uploadedCombos && uploadedCombos.length > 0) {
       for (const combo of uploadedCombos) {
-        const slots = await generateFullSchedule(combo.program, combo.semester, combo.division || 'ALL', facultyAssignments);
+        const slots = await generateFullSchedule(combo.program, combo.semester, combo.division || 'ALL');
         if (slots && slots.length > 0) {
           allSlots.push(...slots);
         }
@@ -219,7 +223,6 @@ export async function POST(request) {
 
       const theoryRoomNo = getTheoryRoom(prog, semNum, div, div);
       const labRoomNos = getLabRooms(prog, semNum, div, div);
-      let labIdx = 0;
 
       for (const slot of slots) {
         // Count faculty conflicts per batch
@@ -261,15 +264,17 @@ export async function POST(request) {
         // Determine candidate primary room
         let targetRoomNo = null;
         if (slot.room && typeof slot.room === 'string' && slot.room.trim().length > 0 && slot.room !== 'null') {
+          // Room was specified in the uploaded timetable — use it directly
           targetRoomNo = slot.room.trim();
         } else if (slot.is_special || slot.subject.includes('Practice School') || slot.subject_code === 'BP706PS') {
           targetRoomNo = '368'; // Practice School Hall
         } else if (slot.class_type === 'theory') {
           targetRoomNo = theoryRoomNo;
         } else if (slot.class_type === 'practical') {
+          // Lab rooms are predefined — each batch maps to a specific lab from the pool
           if (labRoomNos.length > 0) {
-            targetRoomNo = labRoomNos[labIdx % labRoomNos.length];
-            labIdx++;
+            const batchLabIdx = getBatchLabIndex(slot.batch, labRoomNos);
+            targetRoomNo = labRoomNos[batchLabIdx];
           }
         }
 
@@ -361,5 +366,16 @@ export async function GET() {
     assignments: _globalAssignments,
     occupancyKeys: Object.keys(_globalOccupancy).length,
   });
+}
+
+/**
+ * Get a consistent lab room index for a batch.
+ * Batches A, B, C, D map to lab pool indices 0, 1, 2, 3 respectively.
+ * For non-B.Pharm batches, defaults to 0.
+ */
+function getBatchLabIndex(batch, labRoomNos) {
+  if (!batch || batch === 'ALL') return 0;
+  const batchIndex = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+  return (batchIndex[batch] || 0) % labRoomNos.length;
 }
 

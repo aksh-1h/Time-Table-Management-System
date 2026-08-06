@@ -192,14 +192,6 @@ function splitFacultyNames(rawField) {
     .filter(Boolean);
 }
 
-function extractDesignation(name) {
-  if (name.startsWith('Dr.') || name.startsWith('Dr ')) return 'Dr.';
-  if (name.startsWith('Mr.') || name.startsWith('Mr ')) return 'Mr.';
-  if (name.startsWith('Ms.') || name.startsWith('Ms ')) return 'Ms.';
-  if (name.startsWith('Mrs.') || name.startsWith('Mrs ')) return 'Mrs.';
-  return null;
-}
-
 function parseFacultySubjectsData() {
   const raw = JSON.parse(readFileSync(resolve(ROOT, 'Combined WL_Odd_26-27.json'), 'utf-8'));
   
@@ -413,7 +405,6 @@ function parseFacultySubjectsData() {
   // Build unique faculty list with designations
   const faculties = [...allFacultyNames].map(name => ({
     name,
-    designation: extractDesignation(name),
   }));
 
   return { faculties, subjects: allSubjects, assignments: allAssignments };

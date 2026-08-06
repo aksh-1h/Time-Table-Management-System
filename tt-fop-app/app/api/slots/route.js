@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
 import { generateFullSchedule } from '../../lib/workload-generator';
-import { parseFacultySubjectsData } from '../../lib/data-parser';
 import { getTheoryRoom, getLabRooms } from '../../lib/room-allocation-map';
 
 /**
@@ -52,6 +51,10 @@ function syncFromAssignApi() {
 
 export async function GET(request) {
   const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const division = searchParams.get('division');
   const semester = searchParams.get('semester');
@@ -59,81 +62,98 @@ export async function GET(request) {
   const program = searchParams.get('program');
   const unassigned = searchParams.get('unassigned');
 
-  if (supabase) {
-    try {
-      let query = supabase.from('slot_assignments')
-        .select(`*, room:room_id (id, room_no, room_name, category)`)
-        .order('day').order('start_time').limit(1000);
-      if (division) query = query.eq('division', division);
-      if (semester) query = query.eq('semester', parseInt(semester));
-      if (day) query = query.eq('day', day);
-      if (program) query = query.eq('program', program);
-      if (unassigned === 'true') query = query.is('room_id', null);
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return NextResponse.json(data);
-      }
-    } catch (e) {
-      // Fall through to schedule generator fallback
-    }
-  }
-
-  // JSON / Schedule Generator fallback
+  // ── Always use the timetable_uploads → generateFullSchedule path ──
   syncFromAssignApi();
-  const { assignments } = parseFacultySubjectsData();
 
   let allSlots = [];
 
-  const db = createServerSupabaseClient();
-  let query = db.from('timetable_uploads').select('program, semester, division');
-  if (program) query = query.eq('program', program);
-  if (semester) query = query.eq('semester', parseInt(semester));
-  if (division) query = query.eq('division', division);
-  
-  const { data: uploadedCombos } = await query;
-  
-  if (uploadedCombos && uploadedCombos.length > 0) {
-    for (const combo of uploadedCombos) {
-      const prog = combo.program;
-      const sem = combo.semester;
-      const div = combo.division || 'ALL';
-      
-      const slots = await generateFullSchedule(prog, sem, div, assignments);
-      const theoryRoomNo = getTheoryRoom(prog, sem, div, null);
-      const labRoomNos = getLabRooms(prog, sem, div, null);
-      let labIdx = 0;
+  try {
+    let query = supabase.from('timetable_uploads').select('program, semester, division');
+    if (program) query = query.eq('program', program);
+    if (semester) query = query.eq('semester', parseInt(semester));
+    // For division filtering on timetable_uploads:
+    // - B.Pharm stores division as 'A' or 'B'
+    // - M.Pharm stores division as specialization name (e.g., 'Pharmaceutics')
+    // - Pharm D stores division as null
+    // We need to fetch ALL uploads for the program+semester and let generateFullSchedule handle it
+    // Only filter by division for B.Pharm
+    if (division && program === 'B.Pharm') {
+      query = query.eq('division', division);
+    } else if (division && program === 'M.Pharm') {
+      // M.Pharm: the division param from UI is the specialization name
+      query = query.eq('division', division);
+    }
+    // For Pharm D, don't filter by division — it's stored as null
 
-      for (const slot of slots) {
-        const saved = _offlineRoomAssignments[slot.id];
-        if (saved) {
-          slot.room_id = saved.id || null;
-          slot.room = saved;
-          slot.manually_assigned = saved.manually || false;
-        } else if (slot.class_type === 'theory' && theoryRoomNo) {
-          const rNo = slot.is_special || (slot.subject && slot.subject.includes('Practice School')) || slot.subject_code === 'BP706PS' ? '368' : theoryRoomNo;
-          slot.room_id = `room-${rNo}`;
-          slot.room = {
-            id: `room-${rNo}`,
-            room_no: rNo,
-            room_name: rNo === '368' ? 'PSH (Practice School Hall - 368)' : `Room ${rNo}`,
-            category: 'classroom',
-            capacity: 60,
-          };
-        } else if (slot.class_type === 'practical' && labRoomNos.length > 0) {
-          const rNo = labRoomNos[labIdx % labRoomNos.length];
-          labIdx++;
-          slot.room_id = `room-${rNo}`;
-          slot.room = {
-            id: `room-${rNo}`,
-            room_no: rNo,
-            room_name: `Lab ${rNo}`,
-            category: 'lab',
-            capacity: 30,
-          };
+    const { data: uploadedCombos, error: comboErr } = await query;
+
+    if (comboErr) {
+      console.error('[slots] Error querying timetable_uploads:', comboErr.message);
+      return NextResponse.json([]);
+    }
+
+    if (uploadedCombos && uploadedCombos.length > 0) {
+      for (const combo of uploadedCombos) {
+        const prog = combo.program;
+        const sem = combo.semester;
+        const div = combo.division || 'ALL';
+
+        const slots = await generateFullSchedule(prog, sem, div);
+        const theoryRoomNo = getTheoryRoom(prog, sem, div, div);
+        const labRoomNos = getLabRooms(prog, sem, div, div);
+
+        for (const slot of slots) {
+          // Check if this slot was manually assigned in memory
+          const saved = _offlineRoomAssignments[slot.id];
+          if (saved) {
+            slot.room_id = saved.id || null;
+            slot.room = saved;
+            slot.manually_assigned = saved.manually || false;
+          } else if (slot.class_type === 'theory' && theoryRoomNo) {
+            const rNo = slot.is_special || (slot.subject && slot.subject.includes('Practice School')) || slot.subject_code === 'BP706PS' ? '368' : theoryRoomNo;
+            slot.room_id = `room-${rNo}`;
+            slot.room = {
+              id: `room-${rNo}`,
+              room_no: rNo,
+              room_name: rNo === '368' ? 'PSH (Practice School Hall - 368)' : `Room ${rNo}`,
+              category: 'classroom',
+              capacity: 60,
+            };
+          } else if (slot.class_type === 'practical' && labRoomNos.length > 0) {
+            // Lab rooms are predefined — assign based on the slot's batch
+            // Use the room that was defined in the uploaded timetable if available
+            if (slot.room && typeof slot.room === 'string' && slot.room.trim().length > 0 && slot.room !== 'null') {
+              const rNo = slot.room.trim();
+              slot.room_id = `room-${rNo}`;
+              slot.room = {
+                id: `room-${rNo}`,
+                room_no: rNo,
+                room_name: `Lab ${rNo}`,
+                category: 'lab',
+                capacity: 30,
+              };
+            } else {
+              // Fallback: use predefined lab room pool from room-allocation-map
+              // Each batch gets a specific lab from the predefined pool
+              const batchLabIndex = getBatchLabIndex(slot.batch, labRoomNos);
+              const rNo = labRoomNos[batchLabIndex % labRoomNos.length];
+              slot.room_id = `room-${rNo}`;
+              slot.room = {
+                id: `room-${rNo}`,
+                room_no: rNo,
+                room_name: `Lab ${rNo}`,
+                category: 'lab',
+                capacity: 30,
+              };
+            }
+          }
+          allSlots.push(slot);
         }
-        allSlots.push(slot);
       }
     }
+  } catch (e) {
+    console.error('[slots] Error generating slots:', e.message);
+    return NextResponse.json([]);
   }
 
   // Detect Faculty Conflicts across all generated slots
@@ -162,7 +182,7 @@ export async function GET(request) {
     }
   }
 
-  // Filter slots
+  // Filter slots based on query params
   if (program) allSlots = allSlots.filter(s => s.program === program);
   if (division) allSlots = allSlots.filter(s => s.division === division);
   if (semester) allSlots = allSlots.filter(s => s.semester === parseInt(semester));
@@ -170,6 +190,17 @@ export async function GET(request) {
   if (unassigned === 'true') allSlots = allSlots.filter(s => !s.room_id && !s.is_recess && s.class_type !== 'self_study');
 
   return NextResponse.json(allSlots);
+}
+
+/**
+ * Get a consistent lab room index for a batch.
+ * Batches A, B, C, D map to lab pool indices 0, 1, 2, 3 respectively.
+ * For non-B.Pharm batches, defaults to 0.
+ */
+function getBatchLabIndex(batch, labRoomNos) {
+  if (!batch || batch === 'ALL') return 0;
+  const batchIndex = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+  return (batchIndex[batch] || 0) % labRoomNos.length;
 }
 
 export async function PATCH(request) {
@@ -180,23 +211,11 @@ export async function PATCH(request) {
 
   if (supabase) {
     try {
-      const { data: slot, error: slotErr } = await supabase.from('slot_assignments').select('*').eq('id', id).single();
+      const { data: slot, error: slotErr } = await supabase.from('timetable_entries').select('*').eq('id', id).single();
       if (!slotErr && slot) {
-        if (room_id) {
-          const { data: conflicts, error: confErr } = await supabase.from('slot_assignments')
-            .select('id, day, start_time, end_time, subject, faculty, division, batch')
-            .eq('day', slot.day).eq('room_id', room_id).neq('id', id);
-          if (confErr) return NextResponse.json({ error: confErr.message }, { status: 500 });
-          const overlapping = (conflicts || []).filter(c => slot.start_time < c.end_time && c.start_time < slot.end_time);
-          if (overlapping.length > 0) {
-            return NextResponse.json({ error: 'Room conflict detected', conflicts: overlapping.map(c => ({ id: c.id, subject: c.subject, division: c.division, time: `${c.start_time}–${c.end_time}` })) }, { status: 409 });
-          }
-        }
-        const updates = { updated_at: new Date().toISOString() };
-        if (room_id !== undefined) updates.room_id = room_id;
-        if (manually_assigned !== undefined) updates.manually_assigned = manually_assigned;
-        const { data: updated, error: updateErr } = await supabase.from('slot_assignments')
-          .update(updates).eq('id', id).select(`*, room:room_id (id, room_no, room_name, category)`).single();
+        const roomVal = room ? (room.room_no || room) : (room_id ? String(room_id) : null);
+        const { data: updated, error: updateErr } = await supabase.from('timetable_entries')
+          .update({ room: roomVal }).eq('id', id).select().single();
         if (!updateErr && updated) return NextResponse.json(updated);
       }
     } catch (e) {
@@ -222,5 +241,3 @@ export async function PATCH(request) {
   }
   return NextResponse.json({ id, room_id: room_id ?? null, room: room_id && room ? room : null, manually_assigned: !!manually_assigned, _offline: true });
 }
-
-

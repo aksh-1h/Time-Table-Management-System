@@ -26,9 +26,10 @@ export async function GET(request) {
       .eq('program', program)
       .eq('semester', semester);
       
-    if (division && division !== 'ALL') {
+    if (division && division !== 'ALL' && division !== 'null') {
       query = query.eq('division', division);
     } else {
+      // For programs where division is stored as null (e.g., Pharm D)
       query = query.is('division', null);
     }
 

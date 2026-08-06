@@ -57,9 +57,8 @@ function buildLabGroups(slots) {
         const s2 = practicals[i + 1];
         const s3 = practicals[i + 2];
 
-        // Check if consecutive and same subject
-        if (s1.subject === s2.subject && s2.subject === s3.subject &&
-            s1.end_time === s2.start_time && s2.end_time === s3.start_time) {
+        // Check if 3 consecutive slots form a lab block
+        if (s1.end_time === s2.start_time && s2.end_time === s3.start_time) {
           // Found a 3-slot lab group
           const groupKey = `${day}|${s1.start_time}–${s1.end_time}`;
 
@@ -105,7 +104,7 @@ function TimetableContent() {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [options, setOptions] = useState({ programs: [], semesters: [], divisions: [] });
+  const [options, setOptions] = useState({ programs: [], semesters: [], divisions: [], mpharmSpecializations: [] });
 
   // ── Fetch filter options ──
   useEffect(() => {
@@ -115,6 +114,7 @@ function TimetableContent() {
         if (data.programs) setOptions(prev => ({ ...prev, programs: data.programs }));
         if (data.semesters) setOptions(prev => ({ ...prev, semesters: data.semesters }));
         if (data.divisions) setOptions(prev => ({ ...prev, divisions: data.divisions }));
+        if (data.mpharmSpecializations) setOptions(prev => ({ ...prev, mpharmSpecializations: data.mpharmSpecializations }));
       })
       .catch(err => console.error("Error loading filter options:", err));
   }, []);
@@ -207,10 +207,23 @@ function TimetableContent() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>{isOriginal ? 'Original Uploaded Timetable' : 'View Timetable'}</h1>
-          <p>{isOriginal ? 'Showing the timetable structure exactly as uploaded (no rooms assigned)' : 'Optimized timetable with assigned rooms'} · {program} · {program === 'Pharm D' ? 'Year' : 'Sem'} {semester} {program === 'B.Pharm' && `· Div ${division}`}</p>
+          <p>{isOriginal ? 'Showing the timetable structure exactly as uploaded (no rooms assigned)' : 'Optimized timetable with assigned rooms'} · {program} · {program === 'Pharm D' ? 'Year' : 'Sem'} {semester} {program === 'B.Pharm' ? `· Div ${division}` : program === 'M.Pharm' ? `· ${division}` : ''}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select className="filter-select" value={program} onChange={e => { setProgram(e.target.value); setSemester('1'); setDivision('A'); }}>
+          <select className="filter-select" value={program} onChange={e => {
+            const newProg = e.target.value;
+            setProgram(newProg);
+            setSemester('1');
+            // Reset division to appropriate default for the selected program
+            if (newProg === 'M.Pharm') {
+              const specs = options.mpharmSpecializations.length > 0 ? options.mpharmSpecializations : ['Pharmaceutics'];
+              setDivision(specs[0]);
+            } else if (newProg === 'Pharm D') {
+              setDivision('A'); // Pharm D doesn't use division, but keep a default
+            } else {
+              setDivision('A');
+            }
+          }}>
             {(options.programs.length > 0 ? options.programs : ['B.Pharm', 'M.Pharm', 'Pharm D']).map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
@@ -224,11 +237,25 @@ function TimetableContent() {
               <option key={s} value={s}>{program === 'Pharm D' ? `Year ${s}` : `Semester ${s}`}</option>
             ))}
           </select>
-          <select className="filter-select" value={division} onChange={e => setDivision(e.target.value)}>
-            {(options.divisions.length > 0 ? options.divisions : ['A', 'B']).map(d => (
-              <option key={d} value={d}>Division {d}</option>
-            ))}
-          </select>
+          {program === 'Pharm D' ? null : (
+            <select className="filter-select" value={division} onChange={e => setDivision(e.target.value)}>
+              {program === 'M.Pharm' ? (
+                // M.Pharm: show specializations instead of divisions
+                (options.mpharmSpecializations.length > 0 ? options.mpharmSpecializations : [
+                  'Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry',
+                  'Pharmacognosy', 'Quality Assurance', 'Industrial Pharmacy',
+                  'Pharmacy Practice', 'Regulatory Affairs', 'Clinical Research'
+                ]).map(spec => (
+                  <option key={spec} value={spec}>{spec}</option>
+                ))
+              ) : (
+                // B.Pharm: show divisions A, B
+                (options.divisions.length > 0 ? options.divisions : ['A', 'B']).map(d => (
+                  <option key={d} value={d}>Division {d}</option>
+                ))
+              )}
+            </select>
+          )}
           <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="all">All Status</option>
             <option value="assigned">Assigned Only</option>
@@ -462,9 +489,9 @@ function TimetableContent() {
                                     </svg>
                                     Room {slot.room.room_no}
                                   </div>
-                                ) : (
+                                ) : slot.class_type !== 'self_study' ? (
                                   <div className="tt-slot-no-room">— No room</div>
-                                )
+                                ) : null
                               )}
                               {slot.faculty_conflict && (
                                 <div className="tt-faculty-conflict-badge" title={slot.faculty_conflict_detail}>

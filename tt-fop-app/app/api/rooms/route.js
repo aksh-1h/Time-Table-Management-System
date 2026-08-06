@@ -1,30 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
-import { parseRoomsData } from '../../lib/data-parser';
 
 // GET /api/rooms — List all rooms, optionally filtered by category or program
 export async function GET(request) {
   const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const category = searchParams.get('category');
   const program = searchParams.get('program');
 
-  // ── Supabase mode ──
-  if (supabase) {
-    let query = supabase.from('rooms').select('*').order('room_no');
-    if (category) query = query.eq('category', category);
-    if (program) query = query.eq('program', program);
-    const { data, error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
-  }
-
-  // ── JSON fallback mode ──
-  let rooms = parseRoomsData();
-  if (category) rooms = rooms.filter(r => r.category === category);
-  if (program) rooms = rooms.filter(r => r.program === program);
-  rooms.sort((a, b) => a.room_no.localeCompare(b.room_no, undefined, { numeric: true }));
-  return NextResponse.json(rooms);
+  let query = supabase.from('rooms').select('*').order('room_no');
+  if (category) query = query.eq('category', category);
+  if (program) query = query.eq('program', program);
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
 }
 
 // POST /api/rooms — Add a new room (Supabase only)

@@ -58,9 +58,10 @@ async function loadStoredSchedule(program, semester, division) {
       .eq('program', program)
       .eq('semester', semester);
       
-    if (division && division !== 'ALL') {
+    if (division && division !== 'ALL' && division !== 'null') {
       query = query.eq('division', division);
     } else {
+      // For programs where division is stored as null (e.g., Pharm D)
       query = query.is('division', null);
     }
 
@@ -174,16 +175,69 @@ export async function generateFullSchedule(program, semester, division, _faculty
   });
 
   // ─── Process the stored schedule definition ───────────────────
-  const scheduleDef = stored.slots;
+  let scheduleDef = stored.slots;
+
+  // Align all B.Pharm practicals to start at period 3 (13:30)
+  if (program === 'B.Pharm') {
+    scheduleDef = scheduleDef.map(item => {
+      if (item.type === 'practical' && item.period > 2) {
+        return { ...item, period: 3 };
+      }
+      return item;
+    });
+
+    // Deduplicate exact matches after alignment
+    const deduped = [];
+    const seen = new Set();
+    for (const item of scheduleDef) {
+      const key = `${item.day}|${item.period}|${item.batch}|${item.subject}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(item);
+      }
+    }
+    scheduleDef = deduped;
+  }
+
+  // Normalize theory entry period numbers to eliminate duplicate/colliding periods
+  scheduleDef = normalizeScheduleEntries(scheduleDef);
 
   // Auto-expand practical slots: if a practical is only defined at one period per day+batch,
   // expand it to 3 consecutive periods (the 3-hour lab block).
   const expandedDef = [];
-  const practicalDayBatchSet = new Set(); // track "day|batch|period" for dedup
+  const practicalDayBatchSet = new Set(); // track "day|batch" for dedup
+
+  // Also track Practice School / Project 3-hour morning expansion
+  const practiceSchoolDaySet = new Set();
 
   for (const item of scheduleDef) {
     expandedDef.push(item);
 
+    // ── Practice School / Project 3-hour morning expansion ──
+    // If a "Practice School" or "Project" subject appears at period 0 (morning),
+    // auto-expand to periods 0, 1, 2 to create a 3-hour block.
+    if (item.period === 0 && isPracticeSchoolSubject(item.subject)) {
+      const psKey = `${item.day}|${item.batch}`;
+      if (!practiceSchoolDaySet.has(psKey)) {
+        practiceSchoolDaySet.add(psKey);
+        // Check if periods 1 and 2 already have entries for this day+batch
+        const hasP1 = scheduleDef.find(s =>
+          s.day === item.day && (s.batch === item.batch || s.batch === 'ALL') && s.period === 1
+        );
+        const hasP2 = scheduleDef.find(s =>
+          s.day === item.day && (s.batch === item.batch || s.batch === 'ALL') && s.period === 2
+        );
+        // Expand to fill empty morning periods with Practice School
+        if (!hasP1) {
+          expandedDef.push({ ...item, period: 1 });
+        }
+        if (!hasP2) {
+          expandedDef.push({ ...item, period: 2 });
+        }
+      }
+    }
+
+    // ── Afternoon practical 3-hour expansion ──
     // For practical slots at the starting period, check if subsequent periods are already defined
     if (item.type === 'practical' && item.batch && item.batch !== 'ALL') {
       const key = `${item.day}|${item.batch}`;
@@ -217,11 +271,66 @@ export async function generateFullSchedule(program, semester, division, _faculty
     const dayItems = itemsByDay[dName] || [];
     if (dayItems.length === 0) continue; // No slots on this day
 
+    const isSaturday = dName === 'Saturday';
+
+    const expectedBatches = getBatchesForDivision(program, division);
+
+    // ── Fill empty periods with Assignment/Library (weekday) or VAC (Saturday) ──
+    for (let p = 0; p < 6; p++) {
+      const pItems = dayItems.filter(i => i.period === p);
+
+      if (pItems.length === 0) {
+        // No entries for any batch at period p -> whole division is free
+        const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
+        dayItems.push({
+          day: dName,
+          period: p,
+          subject: fillSubject,
+          code: null,
+          type: 'theory',
+          batch: 'ALL',
+          faculty: '',
+          isSpecial: false,
+          _isFiller: true,
+        });
+      } else if (p >= 3 && expectedBatches.length > 1) {
+        // Afternoon periods (3, 4, 5): check if one batch has a lab while the other batch is free
+        const hasPractical = pItems.some(i => i.type === 'practical' && expectedBatches.includes(i.batch));
+        if (hasPractical) {
+          for (const b of expectedBatches) {
+            const batchHasEntry = pItems.some(i => i.batch === b || i.batch === 'ALL');
+            if (!batchHasEntry) {
+              // Batch b has no lab scheduled -> gets Assignment/Library for batch b
+              const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
+              dayItems.push({
+                day: dName,
+                period: p,
+                subject: fillSubject,
+                code: null,
+                type: 'practical',
+                batch: b,
+                faculty: '',
+                isSpecial: false,
+                _isFiller: true,
+              });
+            }
+          }
+        }
+      }
+    }
+
     // Morning slots (periods 0-2)
     const morningItems = dayItems.filter(i => i.period < 3);
+    morningItems.sort((a, b) => a.period - b.period);
     for (const mi of morningItems) {
       const slot = mkSlot(dName, mi.period, mi.subject, mi.code, mi.type, mi.batch, mi.faculty, mi.isSpecial || false);
-      if (slot) slots.push(slot);
+      if (slot) {
+        // Mark filler slots as self_study so they render differently
+        if (mi._isFiller) {
+          slot.class_type = 'self_study';
+        }
+        slots.push(slot);
+      }
     }
 
     // Recess
@@ -229,9 +338,16 @@ export async function generateFullSchedule(program, semester, division, _faculty
 
     // Afternoon slots (periods 3-5)
     const afternoonItems = dayItems.filter(i => i.period >= 3);
+    afternoonItems.sort((a, b) => a.period - b.period);
     for (const ai of afternoonItems) {
       const slot = mkSlot(dName, ai.period, ai.subject, ai.code, ai.type, ai.batch, ai.faculty, ai.isSpecial || false);
-      if (slot) slots.push(slot);
+      if (slot) {
+        if (ai._isFiller) {
+          slot.class_type = ai.type === 'practical' ? 'practical' : 'self_study';
+          slot.is_self_study_filler = true;
+        }
+        slots.push(slot);
+      }
     }
   }
 
@@ -239,10 +355,75 @@ export async function generateFullSchedule(program, semester, division, _faculty
 }
 
 /**
- * Check if a schedule exists for a given program/semester/division.
+ * Check if a subject name refers to Practice School / Project
+ * These are 3-hour morning sessions in Sem 7.
  */
-export function hasStoredSchedule(program, semester, division) {
-  const fileName = scheduleKey(program, Number(semester), division);
-  const filePath = resolve(SCHEDULES_DIR, fileName);
-  return existsSync(filePath);
+function isPracticeSchoolSubject(subject) {
+  if (!subject) return false;
+  const s = subject.toLowerCase();
+  return (
+    s.includes('practice school') ||
+    s.includes('project') ||
+    s.includes('project/') ||
+    s.includes('project /') 
+  );
+}
+
+/**
+ * Normalizes schedule entries to fix duplicate period assignments in uploaded data.
+ * Places theory entries in morning (0, 1, 2) if afternoon is occupied by practicals,
+ * or in afternoon (3, 4, 5) if morning is occupied by Practice School.
+ */
+function normalizeScheduleEntries(scheduleDef) {
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const normalized = [];
+
+  for (const day of days) {
+    const dayEntries = scheduleDef.filter(e => e.day === day);
+    if (dayEntries.length === 0) continue;
+
+    const theoryEntries = dayEntries.filter(e => e.type === 'theory' || e.batch === 'ALL');
+    const practicalEntries = dayEntries.filter(e => e.type === 'practical' && e.batch !== 'ALL');
+
+    // Separate Practice School / Project entries (which belong in morning P:0)
+    const psEntries = theoryEntries.filter(e => e.period === 0 && isPracticeSchoolSubject(e.subject));
+    const regTheoryEntries = theoryEntries.filter(e => !(e.period === 0 && isPracticeSchoolSubject(e.subject)));
+
+    // Keep Practice School entries at P:0
+    normalized.push(...psEntries);
+
+    if (regTheoryEntries.length > 0) {
+      const regPeriods = new Set(regTheoryEntries.map(e => e.period));
+      const hasDuplicates = regTheoryEntries.length > regPeriods.size;
+
+      // Determine if regular theory entries belong in the morning (0, 1, 2) or afternoon (3, 4, 5)
+      const assignMorning = psEntries.length === 0 && (practicalEntries.length > 0 || (regTheoryEntries.every(e => e.period >= 3) && day !== 'Saturday'));
+
+      if (hasDuplicates || (assignMorning && regTheoryEntries.some(e => e.period >= 3))) {
+        let pCounter = assignMorning ? 0 : 3;
+        for (const tEntry of regTheoryEntries) {
+          normalized.push({
+            ...tEntry,
+            period: pCounter
+          });
+          pCounter++;
+          if (pCounter > (assignMorning ? 2 : 5)) {
+            pCounter = assignMorning ? 0 : 3;
+          }
+        }
+      } else {
+        normalized.push(...regTheoryEntries);
+      }
+    }
+
+    // Keep practical entries at period 3
+    for (const pEntry of practicalEntries) {
+      normalized.push({
+        ...pEntry,
+        period: pEntry.period > 2 ? 3 : pEntry.period
+      });
+    }
+  }
+
+  return normalized;
 }

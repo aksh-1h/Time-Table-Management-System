@@ -23,7 +23,6 @@ create table if not exists rooms (
 create table if not exists faculties (
   id UUID primary key default gen_random_uuid (),
   name TEXT not null,
-  designation TEXT,
   is_active BOOLEAN default true,
   created_at TIMESTAMPTZ default now(),
   unique (name)
