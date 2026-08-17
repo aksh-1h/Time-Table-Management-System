@@ -4,9 +4,29 @@ FastAPI-based timetable file parser for the TT-FOP scheduling system.
 
 ## What it does
 
-Accepts uploaded timetable files (PDF, DOCX, JSON, or plain text) and extracts structured schedule entries. Returns JSON that the Next.js upload route inserts directly into the Supabase `timetable_entries` table.
+Accepts uploaded timetable files (PDF, DOCX, JSON, or plain text) and extracts structured schedule entries with **parsing quality scores**. Returns JSON that the Next.js upload route inserts directly into the Supabase `timetable_entries` table.
 
-## Local Development
+## Quick Start (Recommended)
+
+### Option 1: Docker Compose (Both Services)
+
+```bash
+cd TT_FOP
+docker compose up --build
+```
+
+This starts both the parser (port 8000) and the Next.js app (port 3000).
+
+### Option 2: PowerShell Dev Script
+
+```powershell
+cd TT_FOP
+.\start-dev.ps1
+```
+
+Automatically creates the Python venv, installs dependencies, and launches both services.
+
+### Option 3: Manual
 
 ```bash
 cd parser-service
@@ -21,26 +41,41 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run dev server
-uvicorn main:app --reload --port 8000
+python main.py
 ```
 
 The service will be available at `http://localhost:8000`.
 
-- **POST** `/parse-timetable` — Upload a file and get parsed entries
+## Endpoints
+
+- **POST** `/parse-timetable` — Upload a file and get parsed entries with quality scores
 - **GET** `/health` — Health check
+
+## Parsing Score
+
+Each parsed entry receives a confidence score (0–100) based on completeness:
+
+| Field | Points |
+|-------|--------|
+| Subject present (> 2 chars) | 20 |
+| Subject code (e.g. BP101T) | 15 |
+| Faculty present | 15 |
+| Room present | 15 |
+| Day is valid weekday | 10 |
+| Start + end time present | 10 |
+| Batch specified | 5 |
+| Valid class type | 5 |
+| Valid period (0–5) | 5 |
+
+The response includes:
+- `parsing_score` per entry
+- `overall_parsing_score` (mean of all entries)
 
 ## Testing
 
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Parse a DOCX file
-curl -X POST http://localhost:8000/parse-timetable \
-  -F "file=@timetable.docx" \
-  -F "program=B.Pharm" \
-  -F "semester=1" \
-  -F "division=A"
+cd parser-service
+python test_parser.py
 ```
 
 ## Render Deployment (Free Tier)

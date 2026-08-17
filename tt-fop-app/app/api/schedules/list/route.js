@@ -15,7 +15,7 @@ export async function GET() {
     const { data: uploads, error } = await supabase
       .from('timetable_uploads')
       .select(`
-        id, file_path, original_filename, program, semester, division, status, uploaded_at,
+        id, file_path, original_filename, program, semester, division, status, uploaded_at, overall_parsing_score,
         timetable_entries (count)
       `)
       .order('uploaded_at', { ascending: false });
@@ -31,7 +31,8 @@ export async function GET() {
       slotsCount: u.timetable_entries?.[0]?.count || 0,
       updatedAt: u.uploaded_at,
       status: u.status,
-      original_filename: u.original_filename
+      original_filename: u.original_filename,
+      overallParsingScore: u.overall_parsing_score || 0
     }));
 
     return NextResponse.json({ schedules });

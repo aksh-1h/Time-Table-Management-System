@@ -1,0 +1,343 @@
+null,
+{
+    "Column12": "Room No.",
+    "Infrastructure details- PIP": "Room type ",
+    "Column14": "Program"
+},
+{
+    "Column12": 303,
+    "Infrastructure details- PIP": "Class Room -B .Pharm - 1",
+    "Column14": "B .Pharm"
+},
+{
+    "Column12": 304,
+    "Infrastructure details- PIP": "Class Room -B .Pharm - 2",
+    "Column14": "B .Pharm"
+},
+{
+    "Column12": 403,
+    "Infrastructure details- PIP": "Class Room -B .Pharm - 3",
+    "Column14": "B .Pharm"
+},
+{
+    "Column12": 404,
+    "Infrastructure details- PIP": "Class Room -B .Pharm - 4",
+    "Column14": "B .Pharm"
+},
+{
+    "Column12": 407,
+    "Infrastructure details- PIP": "Class Room - Diploma",
+    "Column14": "D. Pharm"
+},
+{
+    "Column12": 364,
+    "Infrastructure details- PIP": "Class Room - Pharm. D - 1 ",
+    "Column14": "Pharm. D"
+},
+{
+    "Column12": 366,
+    "Infrastructure details- PIP": "Class Room - Pharm. D - 2",
+    "Column14": "Pharm. D"
+},
+{
+    "Column12": 368,
+    "Infrastructure details- PIP": "Class Room - Pharm. D - 3",
+    "Column14": "Pharm. D"
+},
+{
+    "Column12": 370,
+    "Infrastructure details- PIP": "Class Room - Pharm. D - PB",
+    "Column14": "Pharm. D (PB)"
+},
+{
+    "Column12": 402,
+    "Infrastructure details- PIP": "Class Room - PG - 1",
+    "Column14": "M Pharm (Pharmacology)"
+},
+{
+    "Column12": 305,
+    "Infrastructure details- PIP": "Class Room - PG - 2",
+    "Column14": "M Pharm (Pharmaceutics)"
+},
+{
+    "Column12": 369,
+    "Infrastructure details- PIP": "Class Room - PG - 3",
+    "Column14": "M Pharm (P. Tech)"
+},
+{
+    "Column12": 372,
+    "Infrastructure details- PIP": "Class Room - PG - 4",
+    "Column14": "M Pharm (QA)"
+},
+{
+    "Column12": 207,
+    "Infrastructure details- PIP": "Class Room - PG - 5",
+    "Column14": "M Pharm (RA)"
+},
+{
+    "Column12": 387,
+    "Infrastructure details- PIP": "Class Room - PG - 6",
+    "Column14": "M Pharm (Pharm. Chemistry)"
+},
+{
+    "Column12": 373,
+    "Infrastructure details- PIP": "Class Room - PG - 7",
+    "Column14": "M Pharm (Phyto)"
+},
+{
+    "Column12": 377,
+    "Infrastructure details- PIP": "Class Room - PG - 8",
+    "Column14": "M Pharm (PP)"
+},
+{
+    "Infrastructure details- PIP": "Class Room - PG - 9",
+    "Column14": "M Pharm (PAnal)"
+},
+null,
+{
+    "Infrastructure details- PIP": "Laboratories"
+},
+null,
+{
+    "Column12": 104,
+    "Infrastructure details- PIP": "Pharmaceutics Lab 1",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 309,
+    "Infrastructure details- PIP": "Pharmaceutics Lab 2",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 311,
+    "Infrastructure details- PIP": "Pharmaceutics Lab 3",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": "201 A",
+    "Infrastructure details- PIP": "Pharmaceutical chemistry Lab 1",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": "201 B",
+    "Infrastructure details- PIP": "Pharmaceutical chemistry Lab 2",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 205,
+    "Infrastructure details- PIP": "Pharmaceutical chemistry Lab 3",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 408,
+    "Infrastructure details- PIP": "Pharmacology Lab 1",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 409,
+    "Infrastructure details- PIP": "Pharmacology Lab 2",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": "401 A",
+    "Infrastructure details- PIP": "Pharmacognosy Lab 1",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": "401 B",
+    "Infrastructure details- PIP": "Pharmacognosy Lab 2",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Infrastructure details- PIP": "UG Pharmacy Practice Lab-1",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Infrastructure details- PIP": "UG Pharmacy Practice Lab-2",
+    "Column14": "B .Pharm, D. Pharm, Pharm D"
+},
+{
+    "Column12": 103,
+    "Infrastructure details- PIP": "M.Pharm - Pharmaceutics Lab -1",
+    "Column14": "M Pharm (Pharmaceutics)"
+},
+{
+    "Column12": 108,
+    "Infrastructure details- PIP": "M.Pharm - Pharmaceutics Lab -2",
+    "Column14": "M Pharm (Pharmaceutics)"
+},
+{
+    "Column12": "210A",
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Chemistry Lab - 1",
+    "Column14": "M Pharm (Pharm. Chemistry)"
+},
+{
+    "Column12": "210B",
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Chemistry Lab - 2",
+    "Column14": "M Pharm (Pharm. Chemistry)"
+},
+{
+    "Column12": 204,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Quality Assurance Lab - 1",
+    "Column14": "M Pharm (QA)"
+},
+{
+    "Column12": 203,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Quality Assurance Lab - 2",
+    "Column14": "M Pharm (QA)"
+},
+{
+    "Column12": "401B",
+    "Infrastructure details- PIP": "M. Pharm - Phytopharmacy and Phytomedicine Lab 1",
+    "Column14": "M Pharm (Phyto)"
+},
+{
+    "Column12": "401B",
+    "Infrastructure details- PIP": "M. Pharm - Phytopharmacy and Phytomedicine Lab 2",
+    "Column14": "M Pharm (Phyto)"
+},
+{
+    "Infrastructure details- PIP": "M. Pharm - Pharmacy Practice Lab 1",
+    "Column14": "M. Pharm - Pharmacy Practice"
+},
+{
+    "Infrastructure details- PIP": "M. Pharm - Pharmacy Practice Lab 2",
+    "Column14": "M. Pharm - Pharmacy Practice"
+},
+{
+    "Column12": 207,
+    "Infrastructure details- PIP": "M. Pharm - Regulatory Affairs  Lab 1",
+    "Column14": "M Pharm (RA)"
+},
+{
+    "Column12": 207,
+    "Infrastructure details- PIP": "M. Pharm - Regulatory Affairs  Lab 2",
+    "Column14": "M Pharm (RA)"
+},
+{
+    "Column12": 205,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical  Analysis Lab 1",
+    "Column14": "M. Pharm - Pharmaceutical  Analysis"
+},
+{
+    "Column12": 205,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical  Analysis Lab 2",
+    "Column14": "M. Pharm - Pharmaceutical  Analysis"
+},
+{
+    "Column12": 103,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Technology Lab 1",
+    "Column14": "M. Pharm - Pharmaceutical Technology"
+},
+{
+    "Column12": 103,
+    "Infrastructure details- PIP": "M. Pharm - Pharmaceutical Technology Lab 2",
+    "Column14": "M. Pharm - Pharmaceutical Technology"
+},
+{
+    "Column12": 410,
+    "Infrastructure details- PIP": "M. Pharm - Pharmacology Lab -1",
+    "Column14": "M. Pharm - Pharmacology"
+},
+{
+    "Column12": 410,
+    "Infrastructure details- PIP": "M. Pharm - Pharmacology Lab -2",
+    "Column14": "M. Pharm - Pharmacology"
+},
+null,
+{
+    "Infrastructure details- PIP": "Other facilties"
+},
+{
+    "Column12": 104,
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Column12": 201,
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Column12": 401,
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Preparation Room",
+    "Column14": "NA"
+},
+{
+    "Column12": 206,
+    "Infrastructure details- PIP": "Central Instrument Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Museum",
+    "Column14": "NA"
+},
+{
+    "Column12": "104 B",
+    "Infrastructure details- PIP": "Machine Room",
+    "Column14": "NA"
+},
+{
+    "Column12": 110,
+    "Infrastructure details- PIP": "Animal House",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Drug Information Centre",
+    "Column14": "NA"
+},
+{
+    "Column12": 306,
+    "Infrastructure details- PIP": "Library & Reading Room",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Library - Pharm D",
+    "Column14": "Pharm D"
+},
+{
+    "Column12": "O- Seminar hall",
+    "Infrastructure details- PIP": "Seminar Hall Pharm.D",
+    "Column14": "Pharm D"
+},
+{
+    "Column12": 202,
+    "Infrastructure details- PIP": "Seminar Hall",
+    "Column14": "NA"
+},
+{
+    "Infrastructure details- PIP": "Computer Centre Pharm.D",
+    "Column14": "Pharm D"
+},
+{
+    "Infrastructure details- PIP": "Computer Room",
+    "Column14": "NA"
+}

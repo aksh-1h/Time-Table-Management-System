@@ -1,0 +1,46 @@
+# ── TT-FOP Docker Compose ──
+# Runs the Python parser service and Next.js app together.
+#
+# Usage:
+#   docker compose up --build        (production-like)
+#   docker compose up --build -d     (detached)
+#
+# For development with hot-reload, see start-dev.ps1 instead.
+
+services:
+  # ── Python Parser Microservice ──
+  parser-service:
+    build:
+      context: ./parser-service
+      dockerfile: Dockerfile
+    container_name: tt-fop-parser
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    environment:
+      - PORT=8000
+
+  # ── Next.js App ──
+  tt-fop-app:
+    build:
+      context: ./tt-fop-app
+      dockerfile: Dockerfile
+    container_name: tt-fop-app
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      parser-service:
+        condition: service_healthy
+    environment:
+      - PARSER_SERVICE_URL=http://parser-service:8000
+      # Pass your Supabase env vars here (or use env_file)
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}

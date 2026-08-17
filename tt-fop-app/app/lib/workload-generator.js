@@ -135,6 +135,9 @@ export async function generateFullSchedule(program, semester, division, _faculty
       finalClassType = 'self_study';
     }
 
+    // Strip FC: prefix from faculty codes (internal parser prefix, not for display)
+    const displayFaculty = facultyName && facultyName.startsWith('FC:') ? facultyName.slice(3) : facultyName;
+
     return {
       id: `slot-${program.replace(/[.\s]/g, '')}-${semester}-${division}-${batch}-${day.slice(0, 3)}-P${periodIndex + 1}-${slotCounter}`,
       program,
@@ -144,7 +147,7 @@ export async function generateFullSchedule(program, semester, division, _faculty
       subject: finalSubject,
       subject_code: subjectCode || null,
       class_type: finalClassType,
-      faculty: facultyName || (finalClassType === 'self_study' || finalClassType === 'recess' ? '' : 'Pending Faculty'),
+      faculty: displayFaculty || (finalClassType === 'self_study' || finalClassType === 'recess' ? '' : 'Pending Faculty'),
       day,
       start_time: period.start,
       end_time: period.end,
@@ -275,44 +278,59 @@ export async function generateFullSchedule(program, semester, division, _faculty
 
     const expectedBatches = getBatchesForDivision(program, division);
 
-    // ── Fill empty periods with Assignment/Library (weekday) or VAC (Saturday) ──
-    for (let p = 0; p < 6; p++) {
-      const pItems = dayItems.filter(i => i.period === p);
+    // ── Fill genuinely empty periods (not mis-assigned ones) ──
+    // Only fill if this day has at least one real (non-filler) entry,
+    // meaning data was uploaded for this day but a specific period is empty.
+    const realDayItems = dayItems.filter(i => !i._isFiller);
+    const hasRealEntries = realDayItems.length > 0;
 
-      if (pItems.length === 0) {
-        // No entries for any batch at period p -> whole division is free
-        const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
-        dayItems.push({
-          day: dName,
-          period: p,
-          subject: fillSubject,
-          code: null,
-          type: 'theory',
-          batch: 'ALL',
-          faculty: '',
-          isSpecial: false,
-          _isFiller: true,
-        });
-      } else if (p >= 3 && expectedBatches.length > 1) {
-        // Afternoon periods (3, 4, 5): check if one batch has a lab while the other batch is free
-        const hasPractical = pItems.some(i => i.type === 'practical' && expectedBatches.includes(i.batch));
-        if (hasPractical) {
-          for (const b of expectedBatches) {
-            const batchHasEntry = pItems.some(i => i.batch === b || i.batch === 'ALL');
-            if (!batchHasEntry) {
-              // Batch b has no lab scheduled -> gets Assignment/Library for batch b
-              const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
-              dayItems.push({
-                day: dName,
-                period: p,
-                subject: fillSubject,
-                code: null,
-                type: 'practical',
-                batch: b,
-                faculty: '',
-                isSpecial: false,
-                _isFiller: true,
-              });
+    if (hasRealEntries) {
+      // Determine which halves of the day have real entries
+      const hasMorningEntries = realDayItems.some(i => i.period < 3);
+      const hasAfternoonEntries = realDayItems.some(i => i.period >= 3);
+
+      for (let p = 0; p < 6; p++) {
+        const pItems = dayItems.filter(i => i.period === p);
+
+        // Only fill empty periods in a half of the day that has OTHER real entries
+        // e.g., if periods 3 and 4 have real data but period 5 is empty → fill period 5
+        // But if NO afternoon periods have data → don't fill any afternoon period
+        const isInActiveMorning = p < 3 && hasMorningEntries;
+        const isInActiveAfternoon = p >= 3 && hasAfternoonEntries;
+
+        if (pItems.length === 0 && (isInActiveMorning || isInActiveAfternoon)) {
+          const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
+          dayItems.push({
+            day: dName,
+            period: p,
+            subject: fillSubject,
+            code: null,
+            type: 'theory',
+            batch: 'ALL',
+            faculty: '',
+            isSpecial: false,
+            _isFiller: true,
+          });
+        } else if (p >= 3 && pItems.length > 0 && expectedBatches.length > 1) {
+          // Afternoon periods: check if one batch has a lab while the other is free
+          const hasPractical = pItems.some(i => i.type === 'practical' && expectedBatches.includes(i.batch));
+          if (hasPractical) {
+            for (const b of expectedBatches) {
+              const batchHasEntry = pItems.some(i => i.batch === b || i.batch === 'ALL');
+              if (!batchHasEntry) {
+                const fillSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
+                dayItems.push({
+                  day: dName,
+                  period: p,
+                  subject: fillSubject,
+                  code: null,
+                  type: 'practical',
+                  batch: b,
+                  faculty: '',
+                  isSpecial: false,
+                  _isFiller: true,
+                });
+              }
             }
           }
         }
