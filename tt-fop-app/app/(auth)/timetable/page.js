@@ -242,9 +242,8 @@ function TimetableContent() {
               {program === 'M.Pharm' ? (
                 // M.Pharm: show specializations instead of divisions
                 (options.mpharmSpecializations.length > 0 ? options.mpharmSpecializations : [
-                  'Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry',
-                  'Pharmacognosy', 'Quality Assurance', 'Industrial Pharmacy',
-                  'Pharmacy Practice', 'Regulatory Affairs', 'Clinical Research'
+                  'Pharmaceutics', 'Pharmachemistry', 'Pharmacology',
+                  'QA', 'Techno', 'PA', 'RA', 'PP', 'Phyto'
                 ]).map(spec => (
                   <option key={spec} value={spec}>{spec}</option>
                 ))

@@ -18,6 +18,7 @@ export async function GET() {
         id, file_path, original_filename, program, semester, division, status, uploaded_at, overall_parsing_score,
         timetable_entries (count)
       `)
+      .neq('status', 'failed')
       .order('uploaded_at', { ascending: false });
 
     if (error) throw error;

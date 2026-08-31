@@ -317,9 +317,8 @@ export default function AssignmentPage() {
             <select className="filter-select" value={filterDivision} onChange={e => setFilterDivision(e.target.value)}>
               {filterProgram === 'M.Pharm' ? (
                 (mpharmSpecializations.length > 0 ? mpharmSpecializations : [
-                  'Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry',
-                  'Pharmacognosy', 'Quality Assurance', 'Industrial Pharmacy',
-                  'Pharmacy Practice', 'Regulatory Affairs', 'Clinical Research'
+                  'Pharmaceutics', 'Pharmachemistry', 'Pharmacology',
+                  'QA', 'Techno', 'PA', 'RA', 'PP', 'Phyto'
                 ]).map(spec => (
                   <option key={spec} value={spec}>{spec}</option>
                 ))

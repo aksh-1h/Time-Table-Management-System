@@ -31,14 +31,14 @@ function buildBatchList() {
   const mpharmSemesters = [1, 3];
   const mpharmSpecializations = [
     'Pharmaceutics',
+    'Pharmachemistry',
     'Pharmacology',
-    'Pharmaceutical Chemistry',
-    'Pharmacognosy',
-    'Quality Assurance',
-    'Industrial Pharmacy',
-    'Pharmacy Practice',
-    'Regulatory Affairs',
-    'Clinical Research',
+    'QA',
+    'Techno',
+    'PA',
+    'RA',
+    'PP',
+    'Phyto',
   ];
   for (const sem of mpharmSemesters) {
     for (const spec of mpharmSpecializations) {

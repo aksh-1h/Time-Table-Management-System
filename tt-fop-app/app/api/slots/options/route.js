@@ -2,18 +2,18 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../lib/supabase-server';
 
 /**
- * M.Pharm specializations list — used when no uploads exist yet
+ * M.Pharm specializations list (9 specializations)
  */
 const MPHARM_SPECIALIZATIONS = [
   'Pharmaceutics',
+  'Pharmachemistry',
   'Pharmacology',
-  'Pharmaceutical Chemistry',
-  'Pharmacognosy',
-  'Quality Assurance',
-  'Industrial Pharmacy',
-  'Pharmacy Practice',
-  'Regulatory Affairs',
-  'Clinical Research',
+  'QA',
+  'Techno',
+  'PA',
+  'RA',
+  'PP',
+  'Phyto',
 ];
 
 export async function GET() {
@@ -53,7 +53,8 @@ export async function GET() {
         }
 
         if (bpharmDivs.size > 0) divisions = [...bpharmDivs].sort();
-        if (mpharmSpecs.size > 0) mpharmSpecializations = [...mpharmSpecs].sort();
+        const allSpecs = new Set([...MPHARM_SPECIALIZATIONS, ...mpharmSpecs]);
+        mpharmSpecializations = [...allSpecs];
       }
     } catch (e) {
       // Fallback to defaults

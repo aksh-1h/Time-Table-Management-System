@@ -1,53 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
 import { generateFullSchedule } from '../../lib/workload-generator';
-import { getTheoryRoom, getLabRooms } from '../../lib/room-allocation-map';
-
-/**
- * Shared in-memory room assignments store.
- * Key: slotId → { id, room_no, room_name, category, capacity, manually }
- */
-const _offlineRoomAssignments = {};
-
-function isGenericFaculty(name) {
-  if (!name) return true;
-  const n = name.trim().toLowerCase();
-  return (
-    n === '' ||
-    n === 'nf' ||
-    n === 'new faculty' ||
-    n === 'pending faculty' ||
-    n === 'pending nf' ||
-    n === 'faculty coordinator' ||
-    n === 'tbd' ||
-    n === 'na' ||
-    n === '-' ||
-    n === 'assignment/library' ||
-    n === 'vac/swayam/nptel'
-  );
-}
-
-function timesOverlap(s1, e1, s2, e2) {
-  return s1 < e2 && s2 < e1;
-}
-
-/** Import from assign API global state */
-function syncFromAssignApi() {
-  try {
-    const { getGlobalAssignments } = require('../assign/route');
-    const globalAssignments = getGlobalAssignments();
-    if (globalAssignments && Object.keys(globalAssignments).length > 0) {
-      for (const [slotId, assignment] of Object.entries(globalAssignments)) {
-        _offlineRoomAssignments[slotId] = {
-          ...assignment.roomObj,
-          manually: assignment.manually || false,
-        };
-      }
-    }
-  } catch (e) {
-    // assign API not loaded yet
-  }
-}
+import { getTheoryRoom, getLabRooms, resolveSubjectLabRoom } from '../../lib/room-allocation-map';
+import {
+  getGlobalAssignments,
+  isGenericFaculty,
+  persistSingleAssignment,
+  removeAssignmentFromDB,
+  setAssignment,
+  removeAssignment,
+  normRoom,
+  timesOverlap,
+} from '../../lib/assignment-state';
 
 export async function GET(request) {
   const supabase = createServerSupabaseClient();
@@ -62,28 +26,30 @@ export async function GET(request) {
   const program = searchParams.get('program');
   const unassigned = searchParams.get('unassigned');
 
-  // ── Always use the timetable_uploads → generateFullSchedule path ──
-  syncFromAssignApi();
+  // BUG-5 FIX: Use shared ESM import instead of require()
+  const globalAssignments = getGlobalAssignments();
 
   let allSlots = [];
 
   try {
+    // Fetch all active rooms for DB lookup
+    const { data: dbRooms } = await supabase.from('rooms').select('*');
+    const roomsByNo = {};
+    if (dbRooms) {
+      for (const r of dbRooms) {
+        roomsByNo[r.room_no] = r;
+        roomsByNo[normRoom(r.room_no)] = r;
+      }
+    }
+
     let query = supabase.from('timetable_uploads').select('program, semester, division');
     if (program) query = query.eq('program', program);
     if (semester) query = query.eq('semester', parseInt(semester));
-    // For division filtering on timetable_uploads:
-    // - B.Pharm stores division as 'A' or 'B'
-    // - M.Pharm stores division as specialization name (e.g., 'Pharmaceutics')
-    // - Pharm D stores division as null
-    // We need to fetch ALL uploads for the program+semester and let generateFullSchedule handle it
-    // Only filter by division for B.Pharm
     if (division && program === 'B.Pharm') {
       query = query.eq('division', division);
     } else if (division && program === 'M.Pharm') {
-      // M.Pharm: the division param from UI is the specialization name
       query = query.eq('division', division);
     }
-    // For Pharm D, don't filter by division — it's stored as null
 
     const { data: uploadedCombos, error: comboErr } = await query;
 
@@ -104,47 +70,42 @@ export async function GET(request) {
 
         for (const slot of slots) {
           // Check if this slot was manually assigned in memory
-          const saved = _offlineRoomAssignments[slot.id];
+          const saved = globalAssignments[slot.id];
           if (saved) {
-            slot.room_id = saved.id || null;
-            slot.room = saved;
+            slot.room_id = saved.roomObj?.id || null;
+            slot.room = saved.roomObj || null;
             slot.manually_assigned = saved.manually || false;
           } else if (slot.class_type === 'theory' && theoryRoomNo) {
             const rNo = slot.is_special || (slot.subject && slot.subject.includes('Practice School')) || slot.subject_code === 'BP706PS' ? '368' : theoryRoomNo;
-            slot.room_id = `room-${rNo}`;
-            slot.room = {
+            const roomObj = roomsByNo[rNo] || roomsByNo[normRoom(rNo)] || {
               id: `room-${rNo}`,
               room_no: rNo,
               room_name: rNo === '368' ? 'PSH (Practice School Hall - 368)' : `Room ${rNo}`,
               category: 'classroom',
               capacity: 60,
             };
-          } else if (slot.class_type === 'practical' && labRoomNos.length > 0) {
-            // Lab rooms are predefined — assign based on the slot's batch
-            // Use the room that was defined in the uploaded timetable if available
+            slot.room_id = roomObj.id;
+            slot.room = roomObj;
+          } else if (slot.class_type === 'practical') {
+            let rNo = null;
             if (slot.room && typeof slot.room === 'string' && slot.room.trim().length > 0 && slot.room !== 'null') {
-              const rNo = slot.room.trim();
-              slot.room_id = `room-${rNo}`;
-              slot.room = {
-                id: `room-${rNo}`,
-                room_no: rNo,
-                room_name: `Lab ${rNo}`,
-                category: 'lab',
-                capacity: 30,
-              };
+              rNo = slot.room.trim();
+            } else if (slot.parsed_room && typeof slot.parsed_room === 'string' && slot.parsed_room.trim().length > 0) {
+              rNo = slot.parsed_room.trim();
             } else {
-              // Fallback: use predefined lab room pool from room-allocation-map
-              // Each batch gets a specific lab from the predefined pool
-              const batchLabIndex = getBatchLabIndex(slot.batch, labRoomNos);
-              const rNo = labRoomNos[batchLabIndex % labRoomNos.length];
-              slot.room_id = `room-${rNo}`;
-              slot.room = {
+              rNo = resolveSubjectLabRoom(slot.subject, labRoomNos);
+            }
+
+            if (rNo) {
+              const roomObj = roomsByNo[rNo] || roomsByNo[normRoom(rNo)] || {
                 id: `room-${rNo}`,
                 room_no: rNo,
                 room_name: `Lab ${rNo}`,
                 category: 'lab',
                 capacity: 30,
               };
+              slot.room_id = roomObj.id;
+              slot.room = roomObj;
             }
           }
           allSlots.push(slot);
@@ -192,17 +153,6 @@ export async function GET(request) {
   return NextResponse.json(allSlots);
 }
 
-/**
- * Get a consistent lab room index for a batch.
- * Batches A, B, C, D map to lab pool indices 0, 1, 2, 3 respectively.
- * For non-B.Pharm batches, defaults to 0.
- */
-function getBatchLabIndex(batch, labRoomNos) {
-  if (!batch || batch === 'ALL') return 0;
-  const batchIndex = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
-  return (batchIndex[batch] || 0) % labRoomNos.length;
-}
-
 export async function PATCH(request) {
   const supabase = createServerSupabaseClient();
   const body = await request.json();
@@ -216,28 +166,28 @@ export async function PATCH(request) {
         const roomVal = room ? (room.room_no || room) : (room_id ? String(room_id) : null);
         const { data: updated, error: updateErr } = await supabase.from('timetable_entries')
           .update({ room: roomVal }).eq('id', id).select().single();
-        if (!updateErr && updated) return NextResponse.json(updated);
+        if (!updateErr && updated) {
+          // BUG-4 FIX: Also persist to slot_assignments for durability
+          if (room && room.room_no) {
+            await persistSingleAssignment(
+              { ...slot, division: slot.division || 'ALL' },
+              room,
+              !!manually_assigned
+            );
+          }
+          return NextResponse.json(updated);
+        }
       }
     } catch (e) {
       // Fallback to in-memory store
     }
   }
 
-  // Offline mode — store in shared memory & assign route global state
+  // Offline mode — store in shared memory via assignment-state module
   if (room_id && room) {
-    _offlineRoomAssignments[id] = { ...room, manually: !!manually_assigned };
-    try {
-      const { getGlobalAssignments } = require('../assign/route');
-      const gAss = getGlobalAssignments();
-      gAss[id] = { roomNo: room.room_no, roomObj: room, manually: !!manually_assigned };
-    } catch (e) {}
+    setAssignment(id, room.room_no, room, !!manually_assigned);
   } else if (room_id === null) {
-    delete _offlineRoomAssignments[id];
-    try {
-      const { getGlobalAssignments } = require('../assign/route');
-      const gAss = getGlobalAssignments();
-      delete gAss[id];
-    } catch (e) {}
+    removeAssignment(id);
   }
   return NextResponse.json({ id, room_id: room_id ?? null, room: room_id && room ? room : null, manually_assigned: !!manually_assigned, _offline: true });
 }

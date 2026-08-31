@@ -92,23 +92,25 @@ def _parse_docx_with_lib(file_bytes: bytes) -> List[dict]:
     print(f"[docx_parser] Found {table_count} table(s) in .docx file")
 
     for table_idx, table in enumerate(doc.tables):
-        # Try flexible day detection across first 3 rows
+        # Try flexible day detection across top 15 rows
         day_columns = {}
-        for row_idx in range(min(3, len(table.rows))):
+        header_row_idx = 0
+        for row_idx in range(min(15, len(table.rows))):
             row = table.rows[row_idx]
             cell_texts = [cell.text.strip() for cell in row.cells]
             candidate = _find_day_columns_flexible(cell_texts)
-            if len(candidate) >= 2:  # Relaxed from 3 to 2
+            if len(candidate) >= 2:
                 day_columns = candidate
+                header_row_idx = row_idx
                 break
 
         if not day_columns:
             print(f"[docx_parser] Table {table_idx}: No day columns detected. Header cells: {[c.text.strip()[:30] for c in table.rows[0].cells] if len(table.rows) > 0 else 'empty'}")
             continue
 
-        print(f"[docx_parser] Table {table_idx}: Detected days: {day_columns}")
+        print(f"[docx_parser] Table {table_idx}: Detected days: {day_columns} at header row {header_row_idx}")
 
-        for row_idx in range(1, len(table.rows)):
+        for row_idx in range(header_row_idx + 1, len(table.rows)):
             row = table.rows[row_idx]
             cells = row.cells
             if len(cells) < 2:
@@ -120,7 +122,7 @@ def _parse_docx_with_lib(file_bytes: bytes) -> List[dict]:
 
             slot_info = find_period_info(time_text)
             if not slot_info:
-                if time_text and len(time_text) > 1 and not any(skip in time_text.upper() for skip in ["RECESS", "BREAK", "LUNCH"]):
+                if time_text and len(time_text) > 1 and not any(skip in time_text.upper() for skip in ["RECESS", "BREAK", "LUNCH", "SUBJECT CODE", "CLASSROOM NO:", "LAB/", "SIGN"]):
                     print(f"[docx_parser] Table {table_idx}, Row {row_idx}: Could not match time '{time_text}' to any period")
                 continue
 
@@ -180,21 +182,23 @@ def _parse_docx_native_xml(file_bytes: bytes) -> List[dict]:
             if len(grid) < 2:
                 continue
 
-            # Flexible day column detection
+            # Flexible day column detection across top 15 rows
             day_columns = {}
-            for r in range(min(3, len(grid))):
+            header_row_idx = 0
+            for r in range(min(15, len(grid))):
                 candidate = _find_day_columns_flexible(grid[r])
                 if len(candidate) >= 2:
                     day_columns = candidate
+                    header_row_idx = r
                     break
 
             if not day_columns:
                 print(f"[docx_parser-xml] Table {tbl_idx}: No day columns detected. First row: {grid[0][:7] if grid else 'empty'}")
                 continue
 
-            print(f"[docx_parser-xml] Table {tbl_idx}: Detected days: {day_columns}")
+            print(f"[docx_parser-xml] Table {tbl_idx}: Detected days: {day_columns} at header row {header_row_idx}")
 
-            for r in range(1, len(grid)):
+            for r in range(header_row_idx + 1, len(grid)):
                 row = grid[r]
                 if len(row) < 2:
                     continue
@@ -205,7 +209,7 @@ def _parse_docx_native_xml(file_bytes: bytes) -> List[dict]:
 
                 slot_info = find_period_info(time_text)
                 if not slot_info:
-                    if time_text and len(time_text) > 1 and not any(skip in time_text.upper() for skip in ["RECESS", "BREAK", "LUNCH"]):
+                    if time_text and len(time_text) > 1 and not any(skip in time_text.upper() for skip in ["RECESS", "BREAK", "LUNCH", "SUBJECT CODE", "CLASSROOM NO:", "LAB/", "SIGN"]):
                         print(f"[docx_parser-xml] Table {tbl_idx}, Row {r}: Could not match time '{time_text}' to any period")
                     continue
 

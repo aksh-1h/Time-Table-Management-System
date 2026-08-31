@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../../lib/supabase-server';
-import { processTimetableFile } from '../../../lib/timetable-parser';
+
+const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL || 'http://localhost:8000';
 
 /**
  * POST /api/schedules/upload
- * Handles file upload, saves raw file to Supabase Storage ('timetables'),
- * parses timetable entries using the EMBEDDED JavaScript parser (no external service),
- * and inserts parsed entries to DB with quality scores.
+ * 
+ * Sends the uploaded timetable file to the Python parser service
+ * for accurate DOCX/PDF/JSON parsing via python-docx + pdfplumber.
+ * 
+ * Requires: Python parser service running at PARSER_SERVICE_URL
+ *   Start with: .\parser-service\venv\Scripts\python.exe parser-service\main.py
  */
 export async function POST(request) {
   const supabase = createServerSupabaseClient();
@@ -29,7 +33,7 @@ export async function POST(request) {
     const originalFilename = file.name;
     const storagePath = `${program}/Sem_${semester}/${Date.now()}_${originalFilename}`;
 
-    // 1. Delete any existing upload for this program/semester/division combo in parallel
+    // 1. Clean up any existing uploads for this program/semester/division
     let existingQuery = supabase.from('timetable_uploads')
       .select('id, file_path')
       .eq('program', program)
@@ -46,15 +50,14 @@ export async function POST(request) {
     if (existingUploads && existingUploads.length > 0) {
       const pathsToRemove = existingUploads.map(e => e.file_path).filter(Boolean);
       const idsToDelete = existingUploads.map(e => e.id);
-
       await Promise.all([
         pathsToRemove.length > 0 ? supabase.storage.from('timetables').remove(pathsToRemove) : Promise.resolve(),
         supabase.from('timetable_uploads').delete().in('id', idsToDelete)
       ]);
     }
 
-    // 2. Upload raw file to Supabase Storage bucket 'timetables'
-    const { data: storageData, error: storageError } = await supabase.storage
+    // 2. Upload raw file to Supabase Storage
+    const { error: storageError } = await supabase.storage
       .from('timetables')
       .upload(storagePath, buffer, { contentType: file.type || 'application/octet-stream', upsert: true });
 
@@ -63,7 +66,7 @@ export async function POST(request) {
       return NextResponse.json({ error: `Storage upload failed: ${storageError.message}` }, { status: 500 });
     }
 
-    // 3. Insert fresh upload record
+    // 3. Insert upload record
     const { data: uploadRecord, error: uploadError } = await supabase
       .from('timetable_uploads')
       .insert({
@@ -78,27 +81,62 @@ export async function POST(request) {
       .single();
 
     if (uploadError) {
-      console.error('Supabase DB upload insert error:', uploadError);
+      console.error('Supabase DB insert error:', uploadError);
       return NextResponse.json({ error: `Database insert failed: ${uploadError.message}` }, { status: 500 });
     }
 
-    // 3. Parse timetable using EMBEDDED JavaScript parser (no external service needed)
+    // 4. Send file to Python parser service
     let parserResult;
     try {
-      parserResult = processTimetableFile(buffer, originalFilename, program, semester, division);
-    } catch (parseError) {
-      console.error('[upload] Parser error:', parseError);
-      await supabase.from('timetable_uploads').update({ status: 'failed' }).eq('id', uploadRecord.id);
-      return NextResponse.json({
-        error: `Parser error: ${parseError.message}`
-      }, { status: 500 });
+      const pyFormData = new FormData();
+      pyFormData.append('file', new Blob([buffer]), originalFilename);
+      pyFormData.append('program', program);
+      pyFormData.append('semester', String(semester));
+      if (division) pyFormData.append('division', division);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout for large files
+
+      const pyResponse = await fetch(`${PARSER_SERVICE_URL}/parse-timetable`, {
+        method: 'POST',
+        body: pyFormData,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!pyResponse.ok) {
+        const errText = await pyResponse.text().catch(() => 'unknown error');
+        throw new Error(`Parser returned HTTP ${pyResponse.status}: ${errText}`);
+      }
+
+      parserResult = await pyResponse.json();
+      console.log(`[upload] Python parser: ${parserResult.count} entries, parser=${parserResult.parser}, score=${parserResult.overall_parsing_score}%`);
+
+    } catch (pyError) {
+      console.error(`[upload] Python parser error: ${pyError.message}`);
+      await Promise.all([
+        supabase.storage.from('timetables').remove([storagePath]),
+        supabase.from('timetable_uploads').delete().eq('id', uploadRecord.id)
+      ]);
+
+      const isConnectionError = pyError.message.includes('fetch failed')
+        || pyError.message.includes('ECONNREFUSED')
+        || pyError.message.includes('aborted')
+        || pyError.name === 'AbortError';
+
+      if (isConnectionError) {
+        return NextResponse.json({
+          error: 'Python parser service is not running. Start it with: .\\parser-service\\venv\\Scripts\\python.exe parser-service\\main.py'
+        }, { status: 503 });
+      }
+
+      return NextResponse.json({ error: `Parser error: ${pyError.message}` }, { status: 500 });
     }
 
     const entries = parserResult.entries || [];
-    const parserUsed = parserResult.parser || 'unknown';
     const overallParsingScore = parserResult.overall_parsing_score || 0;
 
-    // 4. Save parsed entries to timetable_entries table in Supabase
+    // 5. Save parsed entries to database
     if (entries.length > 0) {
       const entriesWithUploadId = entries.map(e => ({
         upload_id: uploadRecord.id,
@@ -118,8 +156,11 @@ export async function POST(request) {
       const { error: insertError } = await supabase.from('timetable_entries').insert(entriesWithUploadId);
 
       if (insertError) {
-        console.error('Error inserting entries to Supabase:', insertError);
-        await supabase.from('timetable_uploads').update({ status: 'failed' }).eq('id', uploadRecord.id);
+        console.error('Error inserting entries:', insertError);
+        await Promise.all([
+          supabase.storage.from('timetables').remove([storagePath]),
+          supabase.from('timetable_uploads').delete().eq('id', uploadRecord.id)
+        ]);
         return NextResponse.json({ error: `Failed to insert slots: ${insertError.message}` }, { status: 500 });
       }
 
@@ -130,10 +171,11 @@ export async function POST(request) {
 
       return NextResponse.json({
         success: true,
-        message: `Successfully uploaded & parsed ${entries.length} slots (${parserUsed} parser). Overall quality: ${overallParsingScore}%`,
+        message: `Parsed ${entries.length} slots via Python (${parserResult.parser}). Quality: ${overallParsingScore}%`,
         id: uploadRecord.id,
         slotsCount: entries.length,
         overallParsingScore,
+        parserSource: 'python',
         entries: entries.map(e => ({
           day: e.day,
           period: e.period,
@@ -149,9 +191,12 @@ export async function POST(request) {
         }))
       });
     } else {
-      await supabase.from('timetable_uploads').update({ status: 'failed' }).eq('id', uploadRecord.id);
+      await Promise.all([
+        supabase.storage.from('timetables').remove([storagePath]),
+        supabase.from('timetable_uploads').delete().eq('id', uploadRecord.id)
+      ]);
       return NextResponse.json({
-        error: 'File uploaded to storage but no valid timetable entries could be extracted. Try a different file format.'
+        error: 'No valid timetable entries could be extracted. Try a different file format.'
       }, { status: 400 });
     }
 

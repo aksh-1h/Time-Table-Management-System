@@ -38,9 +38,8 @@ function buildAllBatches() {
   // 2. M.Pharm: Semesters 1, 3 × Specializations
   const mpharmSemesters = [1, 3];
   const mpharmSpecs = [
-    'Pharmaceutics', 'Pharmacology', 'Pharmaceutical Chemistry',
-    'Pharmacognosy', 'Quality Assurance', 'Industrial Pharmacy',
-    'Pharmacy Practice', 'Regulatory Affairs', 'Clinical Research'
+    'Pharmaceutics', 'Pharmachemistry', 'Pharmacology',
+    'QA', 'Techno', 'PA', 'RA', 'PP', 'Phyto'
   ];
   for (const sem of mpharmSemesters) {
     for (const spec of mpharmSpecs) {
@@ -55,14 +54,14 @@ function buildAllBatches() {
     }
   }
 
-  // 3. Pharm D: Years 1–5 (Annual system)
+  // 3. Pharm D: Years 1–5 (Annual system, no divisions — stored as null in DB)
   for (let year = 1; year <= 5; year++) {
     batches.push({
       id: `PharmD-year${year}`,
       program: 'Pharm D',
       semester: year,
-      division: 'A',
-      label: `Pharm D — Year ${year} (Division A)`,
+      division: null,
+      label: `Pharm D — Year ${year}`,
       category: 'Pharm D'
     });
   }
@@ -169,7 +168,17 @@ export default function UploadPage() {
   const uploadedBatchMap = useMemo(() => {
     const map = new Map();
     for (const sched of storedSchedules) {
-      const key = `${sched.program}-sem${sched.semester}-div${sched.division || 'A'}`;
+      if (sched.status === 'failed') continue;
+      let key = '';
+      if (sched.program === 'B.Pharm') {
+        key = `B.Pharm-sem${sched.semester}-div${sched.division || 'A'}`;
+      } else if (sched.program === 'M.Pharm') {
+        key = `M.Pharm-sem${sched.semester}-${sched.division}`;
+      } else if (sched.program === 'Pharm D') {
+        key = `PharmD-year${sched.semester}`;
+      } else {
+        key = `${sched.program}-sem${sched.semester}-div${sched.division || 'A'}`;
+      }
       map.set(key, sched);
     }
     return map;
@@ -400,7 +409,7 @@ export default function UploadPage() {
   };
 
   const totalBatches = ALL_BATCHES.length;
-  const uploadedCount = storedSchedules.length;
+  const uploadedCount = uploadedBatchMap.size;
   const progressPercent = Math.round((uploadedCount / totalBatches) * 100);
 
   const filteredBatches = useMemo(() => {

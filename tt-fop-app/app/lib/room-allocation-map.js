@@ -38,45 +38,64 @@ const BPHARM_LABS = {
 // ═══════════════════════════════════════════════════════════════
 // M.PHARM ROOM ALLOCATIONS
 // Divisions are specializations (mapped by short code)
+// 9 Canonical Specializations:
+// 1. Pharmaceutics
+// 2. Pharmachemistry / Pharmaceutical Chemistry
+// 3. Pharmacology
+// 4. Pharmacognosy
+// 5. Phytopharmacy and Phytomedicine
+// 6. Pharmaceutical Technology / Techno
+// 7. QA (Quality Assurance)
+// 8. RA (Regulatory Affairs)
+// 9. PP (Pharmacy Practice)
 // ═══════════════════════════════════════════════════════════════
 
 const MPHARM_SPEC_MAP = {
   'Pharmaceutics': 'ceutics',
+  'Pharmachemistry': 'chemistry',
   'Pharmaceutical Chemistry': 'chemistry',
   'Pharmacology': 'cology',
-  'Pharmacognosy': 'PA',       // "Div PA" in the source
-  'Phytopharmacy': 'Phyto',    // could also be "Phytopharmacy & Phytomedicine"
-  'Pharmacy Practice': 'PP',
-  'Quality Assurance': 'QA',
-  'Regulatory Affairs': 'RA',
-  'Industrial Pharmacy': 'techno',
-  'Clinical Research': null,    // not listed in allocation — fallback
-  // Alternate names
+  'Pharmacognosy': 'cognosy',
+  'Phytopharmacy and Phytomedicine': 'Phyto',
+  'Phytopharmacy & Phytomedicine': 'Phyto',
+  'Phytopharmacy': 'Phyto',
+  'Phyto': 'Phyto',
+  'Pharmaceutical Technology': 'techno',
+  'Techno': 'techno',
   'Pharmaceutical Analysis': 'PA',
+  'PA': 'PA',
+  'QA': 'QA',
+  'Quality Assurance': 'QA',
+  'RA': 'RA',
+  'Regulatory Affairs': 'RA',
+  'PP': 'PP',
+  'Pharmacy Practice': 'PP',
 };
 
 const MPHARM_THEORY = {
   'ceutics':   ['305', '403'],
   'chemistry': ['403', 'OSH', '370', '364'],
   'cology':    ['402', '370'],
+  'cognosy':   ['370', '403'],
   'PA':        ['387', '403'],
   'Phyto':     ['403', '368', '387'],
-  'PP':        ['373'],
+  'techno':    ['403', 'OSH'],
   'QA':        ['403'],
   'RA':        ['207'],
-  'techno':    ['403', 'OSH'],
+  'PP':        ['373'],
 };
 
 const MPHARM_LABS = {
   'ceutics':   ['103', '205', '206'],
   'chemistry': ['210', '401 A'],
   'cology':    ['410', '401 B'],
+  'cognosy':   ['401 A', '204'],
   'PA':        ['204'],
   'Phyto':     ['401 A'],
-  'PP':        ['PSH'],
+  'techno':    ['104', '401 B'],
   'QA':        ['205'],
   'RA':        ['207'],
-  'techno':    ['104', '401 B'],
+  'PP':        ['PSH'],
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -183,19 +202,60 @@ function resolveSpecKey(specialization) {
   if (mapped) return mapped;
   
   // Fuzzy match
-  const specLower = specialization.toLowerCase();
+  const specLower = specialization.toLowerCase().trim();
+  if (specLower === 'pp' || specLower.includes('practice') || specLower.includes('pharmacy practice')) return 'PP';
+  if (specLower === 'qa' || specLower.includes('quality') || specLower.includes('assurance')) return 'QA';
+  if (specLower === 'ra' || specLower.includes('regulatory') || specLower.includes('affairs')) return 'RA';
   if (specLower.includes('pharmaceutics') || specLower.includes('ceutics')) return 'ceutics';
-  if (specLower.includes('chemistry')) return 'chemistry';
+  if (specLower.includes('chemistry') || specLower.includes('pharmachemistry')) return 'chemistry';
   if (specLower.includes('pharmacology') || specLower.includes('cology')) return 'cology';
-  if (specLower.includes('pharmacognosy') || specLower.includes('cognosy')) return 'PA';
-  if (specLower.includes('analysis')) return 'PA';
+  if (specLower.includes('pharmacognosy') || specLower.includes('cognosy')) return 'cognosy';
   if (specLower.includes('phyto')) return 'Phyto';
-  if (specLower.includes('practice')) return 'PP';
-  if (specLower.includes('quality') || specLower.includes('qa')) return 'QA';
-  if (specLower.includes('regulatory') || specLower.includes('ra')) return 'RA';
-  if (specLower.includes('industrial') || specLower.includes('techno')) return 'techno';
+  if (specLower.includes('techno') || specLower.includes('technology') || specLower.includes('industrial')) return 'techno';
+  if (specLower.includes('analysis')) return 'PA';
   
   return null;
+}
+
+/**
+ * Maps subject names or abbreviations to dedicated practical lab rooms.
+ * Parul University Pharmacy Department lab allocations:
+ *   - GP (General Pharmacy / Pharmaceutics) → 311 (Pharmaceutics Lab 3)
+ *   - PCG (Pharmacognosy) → 401 B (Pharmacognosy Lab)
+ *   - HPCS (Healthcare Psychology / Communication / Pharmacology) → 408 (Pharmacology Lab 1)
+ *   - HAPP I (Human Anatomy & Physiology) → 409 (Anatomy & Physiology Lab)
+ *   - PIAC (Pharmaceutical Inorganic & Analytical Chem) → 201 A (Pharm Chem Lab)
+ *   - Practice School / Project → 368 (Practice School Hall)
+ */
+export function resolveSubjectLabRoom(subject, pool = []) {
+  if (!subject) return pool[0] || null;
+  const s = subject.trim().toLowerCase();
+  
+  // Specific subject abbreviations and names
+  if (/^gp\b/i.test(subject) || s.includes('general pharmacy') || s.includes('pharmaceutics') || s.includes('dispensing')) {
+    return '311';
+  }
+  if (/^pcg\b/i.test(subject) || s.includes('pharmacognosy') || s.includes('phytochem') || s.includes('cognosy')) {
+    return '401 B';
+  }
+  if (/^hpcs\b/i.test(subject) || s.includes('healthcare psychology') || s.includes('communication skills')) {
+    return '408';
+  }
+  if (/^happ\b/i.test(subject) || s.includes('human anatomy') || s.includes('physiology') || s.includes('pathophysiology')) {
+    return '409';
+  }
+  if (/^piac\b/i.test(subject) || s.includes('inorganic') || s.includes('analytical chemistry') || s.includes('pharmaceutical analysis') || s.includes('pharmaceutical chemistry') || s.includes('organic chemistry') || s.includes('medicinal')) {
+    return '201 A';
+  }
+  if (s.includes('pharmacology') || s.includes('cology')) {
+    return '408';
+  }
+  if (s.includes('practice school') || s.includes('project')) {
+    return '368';
+  }
+  
+  // Fallback to first available room in pool if provided
+  return pool[0] || null;
 }
 
 /**
@@ -219,3 +279,4 @@ export function getAllAllocations() {
     },
   };
 }
+

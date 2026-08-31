@@ -45,38 +45,28 @@ def calculate_parsing_score(entry: dict) -> int:
     """
     Calculate a 0–100 parsing confidence score for a single timetable entry.
 
-    Scoring breakdown:
-      Subject present & > 2 chars:  20 pts
-      Subject code present:         15 pts
-      Faculty present:              15 pts
-      Room present:                 15 pts
-      Day is valid weekday:         10 pts
-      Start & end time present:     10 pts
-      Batch specified:               5 pts
-      Class type is valid:           5 pts
-      Period is valid (0–5):         5 pts
+    Scoring breakdown (optimized for university timetables):
+      Subject present (>= 2 chars):  25 pts
+      Faculty present:               25 pts
+      Day is valid weekday:          10 pts
+      Start & end time present:      10 pts
+      Room present (optional):       10 pts  (theory entries often have no room)
+      Batch specified:                5 pts
+      Subject code (optional):        5 pts
+      Class type is valid:            5 pts
+      Period is valid (0–5):          5 pts
     """
     score = 0
 
-    # Subject: 20 pts
+    # Subject: 25 pts (>= 2 chars to accept "GP", "BPP" etc.)
     subject = (entry.get("subject") or "").strip()
-    if subject and len(subject) > 2:
-        score += 20
+    if subject and len(subject) >= 2:
+        score += 25
 
-    # Subject code: 15 pts (e.g. BP101T, MP201P)
-    subject_code = (entry.get("subject_code") or "").strip()
-    if subject_code and re.match(r"^[A-Z]{1,3}\d{3,4}[A-Z]{0,2}$", subject_code):
-        score += 15
-
-    # Faculty: 15 pts
+    # Faculty: 25 pts
     faculty = (entry.get("faculty") or "").strip()
     if faculty and len(faculty) >= 2:
-        score += 15
-
-    # Room: 15 pts
-    room = (entry.get("room") or "").strip()
-    if room and len(room) >= 1:
-        score += 15
+        score += 25
 
     # Day: 10 pts
     day = (entry.get("day") or "").strip()
@@ -91,9 +81,19 @@ def calculate_parsing_score(entry: dict) -> int:
     if end_time:
         score += 5
 
+    # Room: 10 pts (optional — theory entries legitimately have no room)
+    room = (entry.get("room") or "").strip()
+    if room and len(room) >= 1:
+        score += 10
+
     # Batch: 5 pts
     batch = (entry.get("batch") or "").strip()
     if batch and batch != "":
+        score += 5
+
+    # Subject code (optional): 5 pts
+    subject_code = (entry.get("subject_code") or "").strip()
+    if subject_code and re.match(r"^[A-Z]{1,3}\d{3,4}[A-Z]{0,2}$", subject_code):
         score += 5
 
     # Class type: 5 pts
@@ -203,11 +203,14 @@ def process_timetable_file(
             print(f"[parser] Text parsing error: {e}")
 
     # ── Deduplicate entries ──
+    # BUG-12 FIX: Include end_time and class_type in the dedup key.
+    # Without these, two entries on different periods but with the same
+    # subject/batch/faculty would be incorrectly deduped.
     seen = set()
     unique = []
     for e in entries:
-        key = (e.get("day"), e.get("period"), e.get("start_time"),
-               e.get("subject"), e.get("batch"), e.get("faculty"))
+        key = (e.get("day"), e.get("period"), e.get("start_time"), e.get("end_time"),
+               e.get("subject"), e.get("batch"), e.get("faculty"), e.get("class_type"))
         if key not in seen:
             seen.add(key)
             unique.append(e)

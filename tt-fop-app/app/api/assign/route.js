@@ -1,89 +1,24 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '../../lib/supabase-server';
-import { getTheoryRoom, getLabRooms } from '../../lib/room-allocation-map';
+import { getTheoryRoom, getLabRooms, resolveSubjectLabRoom } from '../../lib/room-allocation-map';
 import { generateFullSchedule } from '../../lib/workload-generator';
-
-/**
- * In-memory global occupancy store.
- * Key format: "day|roomNo" → [{ start, end, slotId, program, semester, division }]
- * 
- * Single source of truth for current assignments.
- */
-let _globalOccupancy = {};
-let _globalAssignments = {};  // slotId → { roomNo, roomObj, manually }
-
-export function getGlobalAssignments() {
-  return _globalAssignments;
-}
-
-export function getGlobalOccupancy() {
-  return _globalOccupancy;
-}
+import {
+  getGlobalAssignments,
+  getGlobalOccupancy,
+  isRoomFree,
+  markRoomOccupied,
+  clearOccupancyForScope,
+  setAssignment,
+  isGenericFaculty,
+  persistAssignmentsToDB,
+  normRoom,
+  timesOverlap,
+} from '../../lib/assignment-state';
 
 const RECESS = { start: '12:30:00', end: '13:30:00' };
 
-function timesOverlap(s1, e1, s2, e2) {
-  return s1 < e2 && s2 < e1;
-}
-
 function isInRecess(start, end) {
   return start < RECESS.end && end > RECESS.start;
-}
-
-function normRoom(no) {
-  return no ? String(no).replace(/\s+/g, '').toUpperCase() : '';
-}
-
-function isRoomFree(day, roomNo, start, end, excludeSlotId) {
-  const key = `${day}|${normRoom(roomNo)}`;
-  const occupants = _globalOccupancy[key] || [];
-  return !occupants.some(
-    o => o.slotId !== excludeSlotId && timesOverlap(start, end, o.start, o.end)
-  );
-}
-
-function markRoomOccupied(day, roomNo, start, end, slotId, program, semester, division) {
-  const key = `${day}|${normRoom(roomNo)}`;
-  if (!_globalOccupancy[key]) _globalOccupancy[key] = [];
-  _globalOccupancy[key].push({ start, end, slotId, program, semester, division });
-}
-
-function clearOccupancyForScope(programs, semesters, divisions) {
-  for (const key of Object.keys(_globalOccupancy)) {
-    _globalOccupancy[key] = _globalOccupancy[key].filter(o => {
-      const inScope = programs.includes(o.program) &&
-                      semesters.includes(o.semester) &&
-                      (divisions.length === 0 || divisions.includes(o.division));
-      if (inScope) {
-        // PRESERVE MANUALLY LOCKED SLOTS
-        const assignment = _globalAssignments[o.slotId];
-        if (assignment && assignment.manually) {
-          return true; // keep manual lock in occupancy
-        }
-        delete _globalAssignments[o.slotId];
-      }
-      return !inScope;
-    });
-    if (_globalOccupancy[key].length === 0) delete _globalOccupancy[key];
-  }
-}
-
-function isGenericFaculty(name) {
-  if (!name) return true;
-  const n = name.trim().toLowerCase();
-  return (
-    n === '' ||
-    n === 'nf' ||
-    n === 'new faculty' ||
-    n === 'pending faculty' ||
-    n === 'pending nf' ||
-    n === 'faculty coordinator' ||
-    n === 'tbd' ||
-    n === 'na' ||
-    n === '-' ||
-    n === 'assignment/library' ||
-    n === 'vac/swayam/nptel'
-  );
 }
 
 /**
@@ -97,6 +32,7 @@ function isGenericFaculty(name) {
  *    Faculty clash DOES NOT stop room assignment.
  * 4. Room Allocation Pass: Assigns room_id if an eligible room is free. If no room is available,
  *    leaves room_id = null and flags room_conflict = true with descriptive message.
+ * 5. BUG-4 FIX: Results are persisted to the `slot_assignments` table for durability.
  */
 export async function POST(request) {
   try {
@@ -152,9 +88,8 @@ export async function POST(request) {
 
     // ─────────────────────────────────────────────────────────────
     // STEP 2: Independent Faculty Clash Detection Pass
-    // Group all non-recess/non-self-study slots by day & faculty
     // ─────────────────────────────────────────────────────────────
-    const slotsByFacultyDay = {}; // `${day}|${faculty}` → [slots]
+    const slotsByFacultyDay = {};
 
     for (const slot of allSlots) {
       if (slot.is_recess || slot.class_type === 'recess' || slot.class_type === 'self_study') continue;
@@ -186,7 +121,7 @@ export async function POST(request) {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // STEP 3: Room Assignment Pass (Operates purely on room_id)
+    // STEP 3: Room Assignment Pass
     // ─────────────────────────────────────────────────────────────
     const stats = {
       totalSlots: 0,
@@ -197,6 +132,8 @@ export async function POST(request) {
       skippedRecess: 0,
       batchResults: [],
     };
+
+    const globalAssignments = getGlobalAssignments();
 
     // Index generated slots by batch
     const batchMap = {};
@@ -225,7 +162,6 @@ export async function POST(request) {
       const labRoomNos = getLabRooms(prog, semNum, div, div);
 
       for (const slot of slots) {
-        // Count faculty conflicts per batch
         if (slot.faculty_conflict) {
           batchResult.facultyConflicts++;
         }
@@ -248,7 +184,7 @@ export async function POST(request) {
         }
 
         // Check if slot was manually locked in memory
-        const existing = _globalAssignments[slot.id];
+        const existing = globalAssignments[slot.id];
         if (existing && existing.manually && existing.roomObj) {
           slot.room_id = existing.roomObj.id;
           slot.room = existing.roomObj;
@@ -264,18 +200,15 @@ export async function POST(request) {
         // Determine candidate primary room
         let targetRoomNo = null;
         if (slot.room && typeof slot.room === 'string' && slot.room.trim().length > 0 && slot.room !== 'null') {
-          // Room was specified in the uploaded timetable — use it directly
           targetRoomNo = slot.room.trim();
-        } else if (slot.is_special || slot.subject.includes('Practice School') || slot.subject_code === 'BP706PS') {
-          targetRoomNo = '368'; // Practice School Hall
+        } else if (slot.parsed_room && typeof slot.parsed_room === 'string' && slot.parsed_room.trim().length > 0) {
+          targetRoomNo = slot.parsed_room.trim();
+        } else if (slot.is_special || (slot.subject && slot.subject.includes('Practice School')) || slot.subject_code === 'BP706PS') {
+          targetRoomNo = '368';
         } else if (slot.class_type === 'theory') {
           targetRoomNo = theoryRoomNo;
         } else if (slot.class_type === 'practical') {
-          // Lab rooms are predefined — each batch maps to a specific lab from the pool
-          if (labRoomNos.length > 0) {
-            const batchLabIdx = getBatchLabIndex(slot.batch, labRoomNos);
-            targetRoomNo = labRoomNos[batchLabIdx];
-          }
+          targetRoomNo = resolveSubjectLabRoom(slot.subject, labRoomNos);
         }
 
         // Candidate room availability check
@@ -285,14 +218,12 @@ export async function POST(request) {
         } else {
           // Fallback search within appropriate category pool
           if (slot.class_type === 'practical') {
-            // First check other lab rooms in the allocated pool for this division
             for (const altRoom of labRoomNos) {
               if (altRoom !== targetRoomNo && isRoomFree(slot.day, altRoom, slot.start_time, slot.end_time, slot.id)) {
                 assignedRoomNo = altRoom;
                 break;
               }
             }
-            // Secondary fallback: search all active lab rooms in the department
             if (!assignedRoomNo) {
               const freeLab = allRooms.find(r => 
                 r.is_active && 
@@ -302,7 +233,6 @@ export async function POST(request) {
               if (freeLab) assignedRoomNo = freeLab.room_no;
             }
           } else if (slot.class_type === 'theory') {
-            // Fallback for theory: search active classrooms in department
             const freeClassroom = allRooms.find(r =>
               r.is_active &&
               (r.category === 'classroom' || r.category === 'general') &&
@@ -326,12 +256,11 @@ export async function POST(request) {
           slot.manually_assigned = false;
 
           markRoomOccupied(slot.day, assignedRoomNo, slot.start_time, slot.end_time, slot.id, prog, semNum, div);
-          _globalAssignments[slot.id] = { roomNo: assignedRoomNo, roomObj, manually: false };
+          setAssignment(slot.id, assignedRoomNo, roomObj, false);
 
           stats.assigned++;
           batchResult.assigned++;
         } else {
-          // Physical Room Shortage: Leave room_id = null, surface conflict reason
           slot.room_id = null;
           slot.room = null;
           slot.room_conflict = true;
@@ -343,6 +272,9 @@ export async function POST(request) {
       }
 
       stats.batchResults.push(batchResult);
+
+      // BUG-4 FIX: Persist this batch's assignments to the DB
+      await persistAssignmentsToDB(slots, prog, semNum, div);
     }
 
     return NextResponse.json({
@@ -363,19 +295,7 @@ export async function POST(request) {
  */
 export async function GET() {
   return NextResponse.json({
-    assignments: _globalAssignments,
-    occupancyKeys: Object.keys(_globalOccupancy).length,
+    assignments: getGlobalAssignments(),
+    occupancyKeys: Object.keys(getGlobalOccupancy()).length,
   });
 }
-
-/**
- * Get a consistent lab room index for a batch.
- * Batches A, B, C, D map to lab pool indices 0, 1, 2, 3 respectively.
- * For non-B.Pharm batches, defaults to 0.
- */
-function getBatchLabIndex(batch, labRoomNos) {
-  if (!batch || batch === 'ALL') return 0;
-  const batchIndex = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
-  return (batchIndex[batch] || 0) % labRoomNos.length;
-}
-

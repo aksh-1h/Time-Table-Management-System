@@ -29,14 +29,23 @@ except ImportError:
 
 
 def parse_pdf(file_bytes: bytes, program: str, semester: int, division: Optional[str] = None) -> List[dict]:
-    """Parse a .pdf timetable file using pdfplumber or native zlib stream text parser."""
+    """Parse a .pdf timetable file using pdfplumber, native Windows OCR, or native zlib stream."""
     if HAS_PDFPLUMBER:
         try:
             entries = _parse_pdf_with_lib(file_bytes)
             if entries:
                 return entries
         except Exception as err:
-            print(f"[pdf_parser] pdfplumber failed ({err}), falling back to native stream reader")
+            print(f"[pdf_parser] pdfplumber failed ({err})")
+
+    # ── Strategy 4: Native Windows OCR fallback (for scanned image PDFs) ──
+    try:
+        ocr_entries = _parse_pdf_with_ocr(file_bytes)
+        if ocr_entries:
+            print(f"[pdf_parser] OCR successfully extracted {len(ocr_entries)} entries")
+            return ocr_entries
+    except Exception as err:
+        print(f"[pdf_parser] OCR fallback error: {err}")
 
     return _parse_pdf_native_stream(file_bytes)
 
@@ -70,6 +79,7 @@ def _parse_pdf_with_lib(file_bytes: bytes) -> List[dict]:
     entries = []
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
+            # ── Strategy 1: Explicit line-based tables ──
             tables = page.extract_tables()
             for table_data in tables:
                 if not table_data or len(table_data) < 2:
@@ -102,6 +112,160 @@ def _parse_pdf_with_lib(file_bytes: bytes) -> List[dict]:
                             continue
 
                         entries.extend(_parse_cell(cell_text, day_name, slot_info))
+
+            if entries:
+                return entries
+
+            # ── Strategy 2: Text-strategy tables ──
+            try:
+                tables_text = page.extract_tables(table_settings={"vertical_strategy": "text", "horizontal_strategy": "text"})
+                for table_data in tables_text:
+                    if not table_data or len(table_data) < 2:
+                        continue
+
+                    day_columns = _find_day_columns_in_grid(table_data)
+                    if not day_columns:
+                        continue
+
+                    header_row_idx = day_columns.pop("__header_row_idx__", 0)
+                    for row_idx in range(header_row_idx + 1, len(table_data)):
+                        row = table_data[row_idx]
+                        if not row or len(row) < 2:
+                            continue
+
+                        time_text = (row[0] or "").strip()
+                        if "RECESS" in time_text.upper():
+                            continue
+
+                        slot_info = find_period_info(time_text)
+                        if not slot_info:
+                            continue
+
+                        for col_idx, day_name in day_columns.items():
+                            if col_idx >= len(row):
+                                continue
+
+                            cell_text = (row[col_idx] or "").strip()
+                            if not cell_text or len(cell_text) < 2 or "RECESS" in cell_text.upper():
+                                continue
+
+                            entries.extend(_parse_cell(cell_text, day_name, slot_info))
+            except Exception as e:
+                print(f"[pdf_parser] Text strategy table extraction error: {e}")
+
+            if entries:
+                return entries
+
+            # ── Strategy 3: Spatial word-grid extraction ──
+            try:
+                spatial_entries = _extract_spatial_timetable_from_pdf(page)
+                if spatial_entries:
+                    entries.extend(spatial_entries)
+            except Exception as e:
+                print(f"[pdf_parser] Spatial word extraction error: {e}")
+
+    return entries
+
+
+def _extract_spatial_timetable_from_pdf(page) -> List[dict]:
+    """Extract timetable cells using word bounding boxes when tables have no visible border lines."""
+    words = page.extract_words()
+    if not words:
+        return []
+
+    day_map = {
+        "MON": "Monday", "MONDAY": "Monday",
+        "TUE": "Tuesday", "TUESDAY": "Tuesday",
+        "WED": "Wednesday", "WEDNESDAY": "Wednesday",
+        "THU": "Thursday", "THURSDAY": "Thursday",
+        "FRI": "Friday", "FRIDAY": "Friday",
+        "SAT": "Saturday", "SATURDAY": "Saturday",
+    }
+
+    day_headers = []
+    for w in words:
+        txt = re.sub(r"[^A-Z]", "", w["text"].upper())
+        if txt in day_map:
+            day_headers.append({
+                "day": day_map[txt],
+                "x0": w["x0"],
+                "x1": w["x1"],
+                "xc": (w["x0"] + w["x1"]) / 2,
+                "top": w["top"],
+                "bottom": w["bottom"],
+            })
+
+    unique_days = {}
+    for dh in day_headers:
+        if dh["day"] not in unique_days or dh["top"] < unique_days[dh["day"]]["top"]:
+            unique_days[dh["day"]] = dh
+
+    sorted_days = sorted(unique_days.values(), key=lambda d: d["xc"])
+    if len(sorted_days) < 3:
+        return []
+
+    col_bounds = []
+    for i in range(len(sorted_days)):
+        left = (sorted_days[i-1]["xc"] + (sorted_days[i]["xc"] - sorted_days[i-1]["xc"])/2) if i > 0 else (sorted_days[i]["x0"] - 30)
+        right = (sorted_days[i]["xc"] + (sorted_days[i+1]["xc"] - sorted_days[i]["xc"])/2) if i < len(sorted_days)-1 else (sorted_days[i]["x1"] + 80)
+        col_bounds.append({
+            "day": sorted_days[i]["day"],
+            "x_min": left,
+            "x_max": right,
+        })
+
+    header_top = min(d["top"] for d in sorted_days)
+    body_words = [w for w in words if w["top"] > header_top + 10]
+
+    time_entries = []
+    for w in body_words:
+        t_match = re.search(r"(\d{1,2}:\d{2})", w["text"])
+        if t_match and w["x0"] < sorted_days[0]["x0"]:
+            time_entries.append({
+                "time_str": t_match.group(1),
+                "top": w["top"],
+                "bottom": w["bottom"],
+            })
+
+    time_rows = []
+    for te in sorted(time_entries, key=lambda t: t["top"]):
+        if not time_rows or te["top"] - time_rows[-1]["top"] > 15:
+            time_rows.append(te)
+
+    entries = []
+    for r_idx, tr in enumerate(time_rows):
+        slot_info = find_period_info(tr["time_str"])
+        if not slot_info:
+            continue
+
+        y_min = tr["top"] - 10
+        y_max = time_rows[r_idx+1]["top"] - 5 if r_idx < len(time_rows)-1 else tr["top"] + 60
+
+        for col in col_bounds:
+            cell_words = [
+                w for w in body_words
+                if y_min <= w["top"] <= y_max and col["x_min"] <= (w["x0"] + w["x1"])/2 <= col["x_max"]
+            ]
+            cell_words.sort(key=lambda w: (round(w["top"] / 5) * 5, w["x0"]))
+            cell_text = " ".join(w["text"] for w in cell_words).strip()
+
+            if not cell_text or "RECESS" in cell_text.upper():
+                continue
+
+            parsed = parse_cell_to_entries(cell_text)
+            for p in parsed:
+                entries.append(build_entry(
+                    day=col["day"],
+                    period=slot_info["period"],
+                    start_time=slot_info["start"],
+                    end_time=slot_info["end"],
+                    subject=p["subject"],
+                    subject_code=p.get("subject_code"),
+                    class_type=p["class_type"],
+                    batch=p["batch"],
+                    faculty=p["faculty"],
+                    room=p["room"],
+                ))
 
     return entries
 
@@ -203,3 +367,159 @@ def _parse_pdf_native_stream(file_bytes: bytes) -> List[dict]:
                 period_counter += 1
 
     return entries
+
+
+def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
+    """Extract timetable cells from image-based scanned PDFs using native Windows WinRT OCR."""
+    try:
+        import asyncio
+        import pypdfium2 as pdfium
+        import winocr
+    except ImportError as e:
+        print(f"[pdf_parser] OCR dependencies not available: {e}")
+        return []
+
+    async def _run():
+        pdf = pdfium.PdfDocument(io.BytesIO(file_bytes))
+        entries = []
+
+        day_map = {
+            "MON": "Monday", "MONDAY": "Monday",
+            "TUE": "Tuesday", "TUESDAY": "Tuesday",
+            "WED": "Wednesday", "WEDNESDAY": "Wednesday",
+            "THU": "Thursday", "THURSDAY": "Thursday",
+            "FRI": "Friday", "FRIDAY": "Friday",
+            "SAT": "Saturday", "SATURDAY": "Saturday",
+        }
+
+        for page_idx in range(len(pdf)):
+            page = pdf[page_idx]
+            bitmap = page.render(scale=200 / 72)
+            pil_img = bitmap.to_pil()
+            if max(pil_img.width, pil_img.height) > 3000:
+                scale_factor = 3000 / max(pil_img.width, pil_img.height)
+                new_size = (int(pil_img.width * scale_factor), int(pil_img.height * scale_factor))
+                pil_img = pil_img.resize(new_size)
+
+            ocr_res = await winocr.recognize_pil(pil_img, lang="en")
+            if not ocr_res or not hasattr(ocr_res, "lines"):
+                continue
+
+            all_words = []
+            for line in ocr_res.lines:
+                for w in line.words:
+                    all_words.append({
+                        "text": w.text,
+                        "x0": w.bounding_rect.x,
+                        "y0": w.bounding_rect.y,
+                        "x1": w.bounding_rect.x + w.bounding_rect.width,
+                        "y1": w.bounding_rect.y + w.bounding_rect.height,
+                        "xc": w.bounding_rect.x + w.bounding_rect.width / 2,
+                        "yc": w.bounding_rect.y + w.bounding_rect.height / 2,
+                    })
+
+            # Detect Day Columns
+            day_headers = []
+            for w in all_words:
+                clean = re.sub(r"[^A-Z]", "", w["text"].upper())
+                if clean in day_map:
+                    day_headers.append({
+                        "day": day_map[clean],
+                        "x0": w["x0"],
+                        "x1": w["x1"],
+                        "xc": w["xc"],
+                        "y0": w["y0"],
+                        "y1": w["y1"],
+                    })
+
+            unique_days = {}
+            for dh in day_headers:
+                if dh["day"] not in unique_days or dh["y0"] < unique_days[dh["day"]]["y0"]:
+                    unique_days[dh["day"]] = dh
+
+            sorted_days = sorted(unique_days.values(), key=lambda d: d["xc"])
+            if len(sorted_days) < 3:
+                continue
+
+            col_bounds = []
+            for i in range(len(sorted_days)):
+                left = (sorted_days[i-1]["xc"] + (sorted_days[i]["xc"] - sorted_days[i-1]["xc"])/2) if i > 0 else (sorted_days[i]["x0"] - 60)
+                right = (sorted_days[i]["xc"] + (sorted_days[i+1]["xc"] - sorted_days[i]["xc"])/2) if i < len(sorted_days)-1 else (sorted_days[i]["x1"] + 150)
+                col_bounds.append({
+                    "day": sorted_days[i]["day"],
+                    "x_min": left,
+                    "x_max": right,
+                })
+
+            header_y = min(d["y0"] for d in sorted_days)
+            body_words = [w for w in all_words if w["y0"] > header_y + 20]
+
+            # Detect Time Rows
+            time_entries = []
+            for w in body_words:
+                t_match = re.search(r"(\d{1,2}:\d{2})", w["text"])
+                if t_match and w["x0"] < sorted_days[0]["x0"] + 30:
+                    time_entries.append({
+                        "time_str": t_match.group(1),
+                        "y0": w["y0"],
+                        "y1": w["y1"],
+                    })
+
+            time_rows = []
+            for te in sorted(time_entries, key=lambda t: t["y0"]):
+                if not time_rows or te["y0"] - time_rows[-1]["y0"] > 40:
+                    time_rows.append(te)
+
+            for r_idx, tr in enumerate(time_rows):
+                slot_info = find_period_info(tr["time_str"])
+                if not slot_info:
+                    continue
+
+                y_min = tr["y0"] - 20
+                y_max = time_rows[r_idx+1]["y0"] - 10 if r_idx < len(time_rows)-1 else tr["y0"] + 150
+
+                for col in col_bounds:
+                    cell_words = [
+                        w for w in body_words
+                        if y_min <= w["yc"] <= y_max and col["x_min"] <= w["xc"] <= col["x_max"]
+                    ]
+                    cell_words.sort(key=lambda w: (round(w["y0"] / 20) * 20, w["x0"]))
+                    cell_text = " ".join(w["text"] for w in cell_words).strip()
+
+                    if not cell_text or "RECESS" in cell_text.upper():
+                        continue
+
+                    parsed = parse_cell_to_entries(cell_text)
+                    for p in parsed:
+                        entries.append(build_entry(
+                            day=col["day"],
+                            period=slot_info["period"],
+                            start_time=slot_info["start"],
+                            end_time=slot_info["end"],
+                            subject=p["subject"],
+                            subject_code=p.get("subject_code"),
+                            class_type=p["class_type"],
+                            batch=p["batch"],
+                            faculty=p["faculty"],
+                            room=p["room"],
+                        ))
+
+        return entries
+
+    try:
+        import asyncio
+        # Handle cases where an event loop is already running (e.g. within FastAPI/Uvicorn)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                return pool.submit(lambda: asyncio.run(_run())).result()
+        else:
+            return asyncio.run(_run())
+    except Exception as err:
+        print(f"[pdf_parser] OCR execution error: {err}")
+        return []
