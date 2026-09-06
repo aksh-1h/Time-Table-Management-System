@@ -33,7 +33,7 @@ function buildLabGroups(slots) {
   // Group practical slots by day+batch
   const practicalsByDayBatch = {};
   for (const s of slots) {
-    if (s.class_type !== 'practical' || !BPHARM_BATCHES.includes(s.batch)) continue;
+    if (s.class_type !== 'practical') continue;
     const key = `${s.day}|${s.batch}`;
     if (!practicalsByDayBatch[key]) practicalsByDayBatch[key] = [];
     practicalsByDayBatch[key].push(s);
@@ -369,11 +369,17 @@ function TimetableContent() {
                         const labGroup = labGroups.get(labGroupKey);
                         if (labGroup && Object.keys(labGroup.batches).length > 0) {
                           const batchEntries = Object.entries(labGroup.batches);
+                          const isSingleBatch = batchEntries.length === 1;
+                          const isTwoBatch = batchEntries.length === 2;
                           return (
                             <td key={day} rowSpan={3} style={{ padding: 0, verticalAlign: 'top' }}>
-                              <div className="tt-lab-merged-container">
+                              <div className={`tt-lab-merged-container${isSingleBatch ? ' tt-lab-merged-single' : ''}${isTwoBatch ? ' tt-lab-two-batch' : ''}`}>
                                 {batchEntries.map(([batchLetter, batchData]) => {
-                                  const colors = BATCH_COLORS[batchLetter] || BATCH_COLORS['A'];
+                                  const isBPharmBatch = BPHARM_BATCHES.includes(batchLetter);
+                                  const colors = isBPharmBatch
+                                    ? (BATCH_COLORS[batchLetter] || BATCH_COLORS['A'])
+                                    : { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.35)', text: '#4f46e5', dot: '#6366f1' };
+                                  const batchLabel = isBPharmBatch ? `BATCH ${batchLetter}` : 'PRACTICAL';
                                   return (
                                     <div
                                       key={batchLetter}
@@ -385,7 +391,7 @@ function TimetableContent() {
                                     >
                                       <div className="tt-batch-header">
                                         <span className="tt-batch-label" style={{ color: colors.text }}>
-                                          BATCH {batchLetter}
+                                          {batchLabel}
                                         </span>
                                         {!isOriginal && batchData.room && (
                                           <span className="tt-batch-room" style={{ color: colors.text }}>
@@ -474,6 +480,21 @@ function TimetableContent() {
 
                         const hasRoom = !!slot.room_id;
                         const isPractical = slot.class_type === 'practical';
+                        const isSelfStudy = slot.class_type === 'self_study' || slot.class_type === 'activity';
+
+                        // Self-study / activity slots get a distinct muted rendering
+                        if (isSelfStudy) {
+                          return (
+                            <td key={day} style={{ padding: 0 }}>
+                              <div className="tt-slot tt-slot-self-study">
+                                <div className="tt-slot-subject">{slot.subject}</div>
+                                {slot.faculty && (
+                                  <div className="tt-slot-faculty">{slot.faculty}</div>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        }
 
                         return (
                           <td key={day} style={{ padding: 0 }}>

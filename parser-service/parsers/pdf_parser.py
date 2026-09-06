@@ -167,6 +167,40 @@ def _parse_pdf_with_lib(file_bytes: bytes) -> List[dict]:
     return entries
 
 
+def _words_to_cell_text(cell_words: list, y_key: str = "top", y_threshold: float = 10.0) -> str:
+    """Group cell words into logical lines by y-coordinate proximity.
+    
+    Instead of joining all words with spaces (which loses line structure),
+    this groups words that are at similar y positions into lines and joins
+    lines with newlines. This is critical for parse_cell_to_entries to
+    properly distinguish subject/faculty/room lines in scanned PDFs.
+    """
+    if not cell_words:
+        return ""
+    
+    # Sort by y then x
+    sorted_words = sorted(cell_words, key=lambda w: (w[y_key], w["x0"]))
+    
+    lines = []
+    current_line_words = [sorted_words[0]]
+    current_y = sorted_words[0][y_key]
+    
+    for w in sorted_words[1:]:
+        if abs(w[y_key] - current_y) <= y_threshold:
+            # Same line
+            current_line_words.append(w)
+        else:
+            # New line
+            lines.append(" ".join(cw["text"] for cw in current_line_words))
+            current_line_words = [w]
+            current_y = w[y_key]
+    
+    if current_line_words:
+        lines.append(" ".join(cw["text"] for cw in current_line_words))
+    
+    return "\n".join(lines)
+
+
 def _extract_spatial_timetable_from_pdf(page) -> List[dict]:
     """Extract timetable cells using word bounding boxes when tables have no visible border lines."""
     words = page.extract_words()
@@ -217,26 +251,38 @@ def _extract_spatial_timetable_from_pdf(page) -> List[dict]:
     header_top = min(d["top"] for d in sorted_days)
     body_words = [w for w in words if w["top"] > header_top + 10]
 
-    time_entries = []
-    for w in body_words:
-        t_match = re.search(r"(\d{1,2}:\d{2})", w["text"])
-        if t_match and w["x0"] < sorted_days[0]["x0"]:
-            time_entries.append({
-                "time_str": t_match.group(1),
-                "top": w["top"],
-                "bottom": w["bottom"],
-            })
+    # Detect Time Rows by grouping time column words into lines
+    time_words = [w for w in body_words if w["x0"] < sorted_days[0]["x0"]]
+    time_words.sort(key=lambda w: (w["top"], w["x0"]))
+    time_lines = []
+    if time_words:
+        cur_line = [time_words[0]]
+        cur_top = time_words[0]["top"]
+        for w in time_words[1:]:
+            if abs(w["top"] - cur_top) <= 12:
+                cur_line.append(w)
+            else:
+                time_lines.append(cur_line)
+                cur_line = [w]
+                cur_top = w["top"]
+        if cur_line:
+            time_lines.append(cur_line)
 
     time_rows = []
-    for te in sorted(time_entries, key=lambda t: t["top"]):
-        if not time_rows or te["top"] - time_rows[-1]["top"] > 15:
-            time_rows.append(te)
+    for line_words in time_lines:
+        line_str = " ".join(cw["text"] for cw in line_words).strip()
+        avg_top = sum(cw["top"] for cw in line_words) / len(line_words)
+        slot_info = find_period_info(line_str)
+        if slot_info:
+            time_rows.append({
+                "time_str": line_str,
+                "top": avg_top,
+                "slot_info": slot_info,
+            })
 
     entries = []
     for r_idx, tr in enumerate(time_rows):
-        slot_info = find_period_info(tr["time_str"])
-        if not slot_info:
-            continue
+        slot_info = tr["slot_info"]
 
         y_min = tr["top"] - 10
         y_max = time_rows[r_idx+1]["top"] - 5 if r_idx < len(time_rows)-1 else tr["top"] + 60
@@ -246,8 +292,8 @@ def _extract_spatial_timetable_from_pdf(page) -> List[dict]:
                 w for w in body_words
                 if y_min <= w["top"] <= y_max and col["x_min"] <= (w["x0"] + w["x1"])/2 <= col["x_max"]
             ]
-            cell_words.sort(key=lambda w: (round(w["top"] / 5) * 5, w["x0"]))
-            cell_text = " ".join(w["text"] for w in cell_words).strip()
+            cell_words.sort(key=lambda w: (w["top"], w["x0"]))
+            cell_text = _words_to_cell_text(cell_words, y_key="top", y_threshold=8.0)
 
             if not cell_text or "RECESS" in cell_text.upper():
                 continue
@@ -454,26 +500,37 @@ def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
             header_y = min(d["y0"] for d in sorted_days)
             body_words = [w for w in all_words if w["y0"] > header_y + 20]
 
-            # Detect Time Rows
-            time_entries = []
-            for w in body_words:
-                t_match = re.search(r"(\d{1,2}:\d{2})", w["text"])
-                if t_match and w["x0"] < sorted_days[0]["x0"] + 30:
-                    time_entries.append({
-                        "time_str": t_match.group(1),
-                        "y0": w["y0"],
-                        "y1": w["y1"],
-                    })
+            # Detect Time Rows by grouping time column words into lines
+            time_words = [w for w in body_words if w["x0"] < sorted_days[0]["x0"] + 30]
+            time_words.sort(key=lambda w: (w["y0"], w["x0"]))
+            time_lines = []
+            if time_words:
+                cur_line = [time_words[0]]
+                cur_y = time_words[0]["y0"]
+                for w in time_words[1:]:
+                    if abs(w["y0"] - cur_y) <= 25:
+                        cur_line.append(w)
+                    else:
+                        time_lines.append(cur_line)
+                        cur_line = [w]
+                        cur_y = w["y0"]
+                if cur_line:
+                    time_lines.append(cur_line)
 
             time_rows = []
-            for te in sorted(time_entries, key=lambda t: t["y0"]):
-                if not time_rows or te["y0"] - time_rows[-1]["y0"] > 40:
-                    time_rows.append(te)
+            for line_words in time_lines:
+                line_str = " ".join(cw["text"] for cw in line_words).strip()
+                avg_y = sum(cw["y0"] for cw in line_words) / len(line_words)
+                slot_info = find_period_info(line_str)
+                if slot_info:
+                    time_rows.append({
+                        "time_str": line_str,
+                        "y0": avg_y,
+                        "slot_info": slot_info,
+                    })
 
             for r_idx, tr in enumerate(time_rows):
-                slot_info = find_period_info(tr["time_str"])
-                if not slot_info:
-                    continue
+                slot_info = tr["slot_info"]
 
                 y_min = tr["y0"] - 20
                 y_max = time_rows[r_idx+1]["y0"] - 10 if r_idx < len(time_rows)-1 else tr["y0"] + 150
@@ -483,8 +540,8 @@ def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
                         w for w in body_words
                         if y_min <= w["yc"] <= y_max and col["x_min"] <= w["xc"] <= col["x_max"]
                     ]
-                    cell_words.sort(key=lambda w: (round(w["y0"] / 20) * 20, w["x0"]))
-                    cell_text = " ".join(w["text"] for w in cell_words).strip()
+                    cell_words.sort(key=lambda w: (w["y0"], w["x0"]))
+                    cell_text = _words_to_cell_text(cell_words, y_key="y0", y_threshold=15.0)
 
                     if not cell_text or "RECESS" in cell_text.upper():
                         continue

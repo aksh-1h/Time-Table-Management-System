@@ -38,7 +38,7 @@ from parsers.mapper import (
 
 
 VALID_DAYS = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
-VALID_CLASS_TYPES = {"theory", "practical", "self_study"}
+VALID_CLASS_TYPES = {"theory", "practical", "self_study", "tutorial", "activity"}
 
 
 def calculate_parsing_score(entry: dict) -> int:
@@ -63,9 +63,14 @@ def calculate_parsing_score(entry: dict) -> int:
     if subject and len(subject) >= 2:
         score += 25
 
-    # Faculty: 25 pts
+    # Faculty: 25 pts (but self_study/activity entries legitimately have no faculty)
     faculty = (entry.get("faculty") or "").strip()
+    class_type_raw = (entry.get("class_type") or "").strip().lower()
+    is_self_study = class_type_raw in ("self_study", "activity")
     if faculty and len(faculty) >= 2:
+        score += 25
+    elif is_self_study:
+        # Self-study entries don't need faculty — give full points
         score += 25
 
     # Day: 10 pts

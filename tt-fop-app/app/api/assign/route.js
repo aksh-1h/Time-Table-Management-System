@@ -92,7 +92,7 @@ export async function POST(request) {
     const slotsByFacultyDay = {};
 
     for (const slot of allSlots) {
-      if (slot.is_recess || slot.class_type === 'recess' || slot.class_type === 'self_study') continue;
+      if (slot.is_recess || slot.class_type === 'recess' || slot.class_type === 'self_study' || slot.class_type === 'activity') continue;
       if (slot.faculty && !isGenericFaculty(slot.faculty)) {
         const key = `${slot.day}|${slot.faculty.trim()}`;
         if (!slotsByFacultyDay[key]) slotsByFacultyDay[key] = [];
@@ -171,7 +171,7 @@ export async function POST(request) {
           continue;
         }
 
-        if (slot.class_type === 'self_study') {
+        if (slot.class_type === 'self_study' || slot.class_type === 'activity') {
           continue;
         }
 
@@ -233,12 +233,34 @@ export async function POST(request) {
               if (freeLab) assignedRoomNo = freeLab.room_no;
             }
           } else if (slot.class_type === 'theory') {
-            const freeClassroom = allRooms.find(r =>
-              r.is_active &&
-              (r.category === 'classroom' || r.category === 'general') &&
-              isRoomFree(slot.day, r.room_no, slot.start_time, slot.end_time, slot.id)
-            );
-            if (freeClassroom) assignedRoomNo = freeClassroom.room_no;
+            // Room Affinity: Try other classrooms assigned to the same program first
+            let fallbackRoom = null;
+            if (prog === 'B.Pharm') {
+              const bpharmClassrooms = ['407', '404', '304', '303'];
+              for (const cr of bpharmClassrooms) {
+                if (cr !== targetRoomNo && isRoomFree(slot.day, cr, slot.start_time, slot.end_time, slot.id)) {
+                  fallbackRoom = cr;
+                  break;
+                }
+              }
+            } else if (prog === 'Pharm D') {
+              const pharmdClassrooms = ['366', '368', '364', '377', '372'];
+              for (const cr of pharmdClassrooms) {
+                if (cr !== targetRoomNo && isRoomFree(slot.day, cr, slot.start_time, slot.end_time, slot.id)) {
+                  fallbackRoom = cr;
+                  break;
+                }
+              }
+            }
+            if (!fallbackRoom) {
+              const freeClassroom = allRooms.find(r =>
+                r.is_active &&
+                (r.category === 'classroom' || r.category === 'general') &&
+                isRoomFree(slot.day, r.room_no, slot.start_time, slot.end_time, slot.id)
+              );
+              if (freeClassroom) fallbackRoom = freeClassroom.room_no;
+            }
+            if (fallbackRoom) assignedRoomNo = fallbackRoom;
           }
         }
 

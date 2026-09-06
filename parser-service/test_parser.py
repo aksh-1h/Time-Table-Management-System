@@ -187,17 +187,43 @@ if result2:
     test("2-line: subject stripped", "(BP101T)" not in result2[0]["subject"], True)
     test("2-line: code extracted", result2[0]["subject_code"], "BP101T")
 
-# -- BUG-9: Filler cells produce 0 entries --
-print("\n-- BUG-9: Filler cell skipping --")
-test("Assignment / Library -> 0", len(parse_cell_to_entries("Assignment / Library")), 0)
-test("Weekly Test -> 0", len(parse_cell_to_entries("Weekly Test")), 0)
+# -- BUG-9: Filler cells produce self_study entries (no empty slots in timetable) --
+print("\n-- BUG-9: Filler cell handling --")
+al_entries = parse_cell_to_entries("Assignment / Library")
+test("Assignment / Library -> 1", len(al_entries), 1)
+if al_entries:
+    test("Assignment / Library class_type=self_study", al_entries[0]["class_type"], "self_study")
+    test("Assignment / Library subject normalized", al_entries[0]["subject"], "Assignment/Library")
+
+wt_entries = parse_cell_to_entries("Weekly Test")
+test("Weekly Test -> 1", len(wt_entries), 1)
+if wt_entries:
+    test("Weekly Test class_type=self_study", wt_entries[0]["class_type"], "self_study")
+
 test("RECESS -> 0", len(parse_cell_to_entries("RECESS")), 0)
-test("Remedial -> 0", len(parse_cell_to_entries("Remedial")), 0)
-test("Sports -> 0", len(parse_cell_to_entries("Sports")), 0)
-test("Free Period -> 0", len(parse_cell_to_entries("Free Period")), 0)
+test("Remedial -> 1", len(parse_cell_to_entries("Remedial")), 1)
+test("Sports -> 1", len(parse_cell_to_entries("Sports")), 1)
+test("Free Period -> 1", len(parse_cell_to_entries("Free Period")), 1)
 # But real subjects should still work:
 test("PM KVT 309 -> 1 (real subject)", len(parse_cell_to_entries("PM KVT 309")), 1)
 test("HAPP I still parses", len(parse_cell_to_entries("HAPP I\nJVS")), 1)
+
+# -- NEW: Multi-faculty slash tokens (e.g. APP/RKS) --
+print("\n-- NEW: Multi-faculty slash parsing --")
+multi_fac = parse_cell_to_entries("PP I\nAPP/RKS")
+test("Multi-faculty: 1 entry", len(multi_fac), 1)
+if multi_fac:
+    test("Multi-faculty code preserved", multi_fac[0]["faculty"], "FC:APP/RKS")
+    test("Multi-faculty subject", multi_fac[0]["subject"], "PP I")
+
+# -- NEW: Saturday tutorial cell parsing --
+print("\n-- NEW: Saturday tutorial cell parsing --")
+sat_cell = parse_cell_to_entries("PP I (T)\nAPP /\nVAC*/ SWAYAM/NPTEL")
+test("Saturday cell: 1 entry", len(sat_cell), 1)
+if sat_cell:
+    test("Saturday subject=PP I", sat_cell[0]["subject"], "PP I")
+    test("Saturday faculty=FC:APP", sat_cell[0]["faculty"], "FC:APP")
+    test("Saturday class_type=theory", sat_cell[0]["class_type"], "theory")
 
 # -- Summary --
 print("\n" + "=" * 60)

@@ -18,7 +18,7 @@
  * B.Pharm: Div A → Batches [A, B], Div B → Batches [C, D]
  */
 
-import { createServerSupabaseClient } from './supabase-server';
+import { createServerSupabaseClient } from './supabase-server.js';
 
 const PERIODS = [
   { start: '09:30:00', end: '10:30:00', label: '09:30 - 10:30' },
@@ -152,12 +152,16 @@ export async function generateFullSchedule(program, semester, division, _faculty
 
     const isSaturday = day === 'Saturday';
 
-    // Handle free slot labels
+    // Handle free slot labels — only for truly empty/FREE/NA subjects
+    // Don't override if already a self_study entry from the parser (e.g. 'Weekly Test')
     let finalSubject = subjectName;
     let finalClassType = classType;
 
     if (!subjectName || subjectName === 'FREE' || subjectName === 'NA') {
       finalSubject = isSaturday ? 'VAC/SWAYAM/NPTEL' : 'Assignment/Library';
+      finalClassType = 'self_study';
+    } else if (classType === 'self_study') {
+      // Preserve self_study entries from the parser as-is
       finalClassType = 'self_study';
     }
 
@@ -183,6 +187,7 @@ export async function generateFullSchedule(program, semester, division, _faculty
       start_time: finalStartTime,
       end_time: finalEndTime,
       period_index: periodIndex,
+      period: periodIndex,
       room_id: cleanRoom ? `room-${cleanRoom}` : null,
       room: cleanRoom || null,
       parsed_room: cleanRoom || null,
@@ -233,6 +238,11 @@ export async function generateFullSchedule(program, semester, division, _faculty
   // ─── Auto-expand 3-hour practical / Practice School blocks ─────
   // Only expand if the target period slots don't already exist in the data.
   // This prevents doubling entries when the parser already created all 3 periods.
+  //
+  // CRITICAL: When expanding, we MUST update start_time and end_time to match
+  // the target period from PERIODS[]. Otherwise the cloned items keep the
+  // original period's DB times, causing all 3 slots to appear at the same time
+  // (e.g. all at 13:30-14:30), which triggers false faculty clash detection.
   const expandedDef = [];
   const expandedKeySet = new Set();
 
@@ -246,10 +256,10 @@ export async function generateFullSchedule(program, semester, division, _faculty
         expandedKeySet.add(psKey);
         // Only add expanded periods if they don't already exist in parsed data
         if (!existingSlotKeys.has(`${item.day}|1|${item.batch}`)) {
-          expandedDef.push({ ...item, period: 1 });
+          expandedDef.push({ ...item, period: 1, start_time: PERIODS[1].start, end_time: PERIODS[1].end });
         }
         if (!existingSlotKeys.has(`${item.day}|2|${item.batch}`)) {
-          expandedDef.push({ ...item, period: 2 });
+          expandedDef.push({ ...item, period: 2, start_time: PERIODS[2].start, end_time: PERIODS[2].end });
         }
       }
     }
@@ -262,11 +272,12 @@ export async function generateFullSchedule(program, semester, division, _faculty
         const p1 = item.period + 1;
         const p2 = item.period + 2;
         // Only add expanded periods if they don't already exist in parsed data
+        // Use correct PERIODS[] times so each expanded slot has the right time range
         if (p1 <= 5 && !existingSlotKeys.has(`${item.day}|${p1}|${item.batch}`)) {
-          expandedDef.push({ ...item, period: p1 });
+          expandedDef.push({ ...item, period: p1, start_time: PERIODS[p1].start, end_time: PERIODS[p1].end });
         }
         if (p2 <= 5 && !existingSlotKeys.has(`${item.day}|${p2}|${item.batch}`)) {
-          expandedDef.push({ ...item, period: p2 });
+          expandedDef.push({ ...item, period: p2, start_time: PERIODS[p2].start, end_time: PERIODS[p2].end });
         }
       }
     }

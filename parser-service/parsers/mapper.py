@@ -131,6 +131,10 @@ def find_period_info(time_text: str) -> Optional[dict]:
         if 750 <= _rmins <= 809:
             return None
 
+    # Check for period 3 shorthand: "1 - 2:30", "1 to 2:30", "1 2:30 -", "01:30 - 02:30"
+    if re.search(r"\b(?:0?1|1:30)\b.*?\b(?:0?2|2:30)\b", time_text, re.IGNORECASE):
+        return {"period": 3, "start": "13:30:00", "end": "14:30:00"}
+
     for p in PERIOD_MAP:
         for marker in p["markers"]:
             if marker in clean:
@@ -247,30 +251,80 @@ def _extract_metadata(line: str) -> dict:
     return result
 
 
-# BUG-9 FIX: Known non-teaching / filler patterns that should never produce entries.
-# These appear in timetable cells but are not actual classes.
+# Patterns that should be fully skipped (produce 0 entries)
 _SKIP_PATTERNS = [
     "RECESS", "BREAK", "LUNCH",
-    "ASSIGNMENT", "LIBRARY", "ASSIGNMENT/LIBRARY", "ASSIGNMENT / LIBRARY",
+    "SIGN OF HOD", "SIGN",
+    "CLASSROOM NO",
+    "LAB/ TUTORIAL LOCATION",
+    "SUBJECT CODE", "SUBJECT INITIALS", "STAFF INITIALS", "STAFF NAME",
+    "STAFF EMAIL", "MFT / FACULTY",
+]
+
+# Patterns that should produce a self_study entry (not empty)
+_SELF_STUDY_PATTERNS = [
+    "ASSIGNMENT", "ASSIGNMENT/LIBRARY", "ASSIGNMENT / LIBRARY",
     "WEEKLY TEST", "WEEKLY TESTS",
     "REMEDIAL", "REMEDIAL CLASS",
     "SPORTS", "CO-CURRICULAR",
     "FREE", "FREE PERIOD",
-    "SIGN OF HOD", "SIGN",
-    "CLASSROOM NO",
 ]
 
 
-def _is_filler_cell(text: str) -> bool:
-    """Check if a cell's content is a non-teaching filler that should be skipped."""
+def _classify_filler_cell(text: str) -> Optional[str]:
+    """Classify a cell as 'skip' (produce nothing), 'self_study' (produce a self_study entry),
+    or None (not a filler — parse normally)."""
     upper = text.strip().upper()
-    # Exact match or contained-in check
+    # Remove VAC/SWAYAM/NPTEL suffixes for classification purposes
+    clean_for_check = re.sub(r"[/\s]*VAC\*?[/\s]*SWAYAM[/\s]*NPTEL.*$", "", upper, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"[^A-Z0-9/ ]", "", clean_for_check).strip()
+    
     for pat in _SKIP_PATTERNS:
-        if upper == pat or upper.startswith(pat + " ") or upper.endswith(" " + pat):
-            return True
-    # Check if the entire cell is just a filler phrase (possibly with punctuation)
-    cleaned = re.sub(r"[^A-Z0-9/ ]", "", upper).strip()
-    return cleaned in _SKIP_PATTERNS
+        if upper == pat or upper.startswith(pat + " ") or cleaned == pat:
+            return "skip"
+    for pat in _SELF_STUDY_PATTERNS:
+        if upper == pat or upper.startswith(pat + " ") or upper.endswith(" " + pat) or cleaned == pat:
+            return "self_study"
+        # Also check the VAC-stripped version
+        if clean_for_check == pat or clean_for_check.startswith(pat + " ") or clean_for_check.endswith(" " + pat):
+            return "self_study"
+    # Pure VAC/SWAYAM/NPTEL-only cell
+    vac_only = re.sub(r"[^A-Z0-9/ ]", "", upper).strip()
+    if vac_only in ("VAC SWAYAM NPTEL", "VAC/ SWAYAM/NPTEL", "VAC /SWAYAM/NPTEL"):
+        return "self_study"
+    return None
+
+
+def _normalize_filler_subject(text: str) -> str:
+    """Normalize filler cell text to a clean subject name for self_study entries."""
+    upper = text.strip().upper()
+    # Strip trailing VAC/SWAYAM/NPTEL suffix
+    cleaned = re.sub(r"[/\s]*VAC\*?[/\s]*(?:SWAYAM)?[/\s]*(?:NPTEL)?\s*$", "", upper, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"[/\s]+$", "", cleaned).strip()
+    if not cleaned:
+        return "VAC/SWAYAM/NPTEL"
+    # Normalize common patterns
+    norm_map = {
+        "ASSIGNMENT": "Assignment/Library",
+        "ASSIGNMENT/LIBRARY": "Assignment/Library",
+        "ASSIGNMENT / LIBRARY": "Assignment/Library",
+        "ASSIGNMENT /LIBRARY": "Assignment/Library",
+        "ASSIGNMENT /LIBRARY/ REMEDIAL": "Assignment/Library",
+        "ASSIGNMENT /LIBRARY/REMEDIAL": "Assignment/Library",
+        "WEEKLY TEST": "Weekly Test",
+        "WEEKLY TESTS": "Weekly Test",
+        "REMEDIAL": "Remedial",
+        "REMEDIAL CLASS": "Remedial",
+        "SPORTS": "Sports",
+        "CO-CURRICULAR": "Co-Curricular",
+        "FREE": "Free Period",
+        "FREE PERIOD": "Free Period",
+    }
+    # Try exact match first, then prefix match
+    for pat, label in norm_map.items():
+        if cleaned == pat or cleaned.startswith(pat):
+            return label
+    return text.strip()
 
 
 def _strip_subject_code(subject: str, subject_code: Optional[str] = None) -> str:
@@ -284,9 +338,15 @@ def _strip_subject_code(subject: str, subject_code: Optional[str] = None) -> str
     return result if result else subject
 
 
-def parse_cell_to_entries(cell_text: str) -> List[dict]:
+def parse_cell_to_entries(cell_text: str, doc_metadata: Optional[dict] = None) -> List[dict]:
     """
     Parse a timetable cell's full text into one or more logical entry blocks.
+    
+    Args:
+        cell_text: Raw cell text from the timetable document.
+        doc_metadata: Optional metadata extracted from the document's legend table.
+            Keys: 'faculty_map' (initials→full name), 'subject_map' (initials→code),
+            'classroom' (default theory room), 'lab_rooms' (list of lab rooms).
     """
     if not cell_text or len(cell_text.strip()) < 2:
         return []
@@ -295,9 +355,19 @@ def parse_cell_to_entries(cell_text: str) -> List[dict]:
     if "RECESS" in clean.upper():
         return []
 
-    # BUG-9 FIX: Skip known filler cells before any parsing
-    if _is_filler_cell(clean):
+    # Classify filler cells: skip, self_study, or parse normally
+    filler_type = _classify_filler_cell(clean)
+    if filler_type == "skip":
         return []
+    if filler_type == "self_study":
+        return [{
+            "subject": _normalize_filler_subject(clean),
+            "subject_code": None,
+            "class_type": "self_study",
+            "batch": "ALL",
+            "faculty": None,
+            "room": None,
+        }]
 
     lines = [ln.strip() for ln in clean.split("\n") if ln.strip()]
     if not lines:
@@ -318,7 +388,8 @@ def parse_cell_to_entries(cell_text: str) -> List[dict]:
         line2_compact = re.match(r"^([A-Z]{2,5})\s+(\d{3}\s*[A-Z]?)$", line2.strip())
         
         # Check if line2 is just a faculty code: "JVS", "BKS", "RR"
-        line2_faculty_only = re.match(r"^([A-Z]{2,5})$", line2.strip())
+        # Also support multi-faculty slash: "APP/RKS", "JHB/SJP"
+        line2_faculty_only = re.match(r"^([A-Z]{2,5}(?:\s*/\s*[A-Z]{2,5})*)$", line2.strip())
         
         if batch_in_line1 and line2_compact:
             # PRACTICAL: "GP BATCH A" + "JHB 311"
@@ -378,6 +449,68 @@ def parse_cell_to_entries(cell_text: str) -> List[dict]:
                 "batch": "ALL",
                 "faculty": f"FC:{faculty_code}",
                 "room": room,
+            }]
+
+    # ── SATURDAY / TUTORIAL CELL HANDLER ──
+    # Handles cells like: "PP I (T)\nAPP /\nVAC*/ SWAYAM/NPTEL"
+    # or "PM (T)\nJHB /\nVAC*/ SWAYAM/NPTEL"
+    # or "POC II (T)\nNSP /\nVAC*/ SWAYAM/NPTEL"
+    # These contain: SUBJECT (T) / FACULTY / VAC suffix spread across lines
+    joined_text = " ".join(lines)
+    if "VAC" in joined_text.upper() and ("SWAYAM" in joined_text.upper() or "NPTEL" in joined_text.upper()):
+        # Try to extract: SUBJECT (T) FACULTY / VAC*/ SWAYAM/NPTEL
+        # Step 1: Strip VAC/SWAYAM/NPTEL suffix from joined text
+        core = re.sub(r"[/\s]*VAC\*?[/\s]*SWAYAM[/\s]*/?\s*NPTEL.*$", "", joined_text, flags=re.IGNORECASE).strip()
+        core = re.sub(r"[/\s]+$", "", core).strip()
+        
+        # Step 2: Extract tutorial marker (T)
+        has_tutorial = bool(re.search(r"\(T\)", core, re.IGNORECASE))
+        core = re.sub(r"\s*\(T\)\s*", " ", core, flags=re.IGNORECASE).strip()
+        
+        # Step 3: Try to find faculty code at the end: "PP I APP" or "PM JHB"
+        # Pattern: SUBJECT FACULTY_CODE where FACULTY_CODE is 2-5 uppercase letters
+        fac_match = re.match(r"^(.+?)\s+([A-Z]{2,5}(?:\s*/\s*[A-Z]{2,5})*)$", core)
+        if fac_match:
+            subject = fac_match.group(1).strip()
+            faculty_code = fac_match.group(2).strip()
+            
+            code_match = _RE_SUBJECT_CODE.search(subject)
+            subject_code = code_match.group(1) if code_match else None
+            subject = _strip_subject_code(subject, subject_code)
+            
+            # Resolve faculty from doc_metadata if available
+            faculty_display = f"FC:{faculty_code}"
+            if doc_metadata and "faculty_map" in doc_metadata:
+                resolved = doc_metadata["faculty_map"].get(faculty_code)
+                if resolved:
+                    faculty_display = resolved
+            
+            # Resolve subject_code from doc_metadata if available
+            if not subject_code and doc_metadata and "subject_map" in doc_metadata:
+                subject_code = doc_metadata["subject_map"].get(subject.strip())
+            
+            return [{
+                "subject": subject[:80],
+                "subject_code": subject_code,
+                "class_type": "theory",
+                "batch": "ALL",
+                "faculty": faculty_display,
+                "room": None,
+            }]
+        else:
+            # No faculty found, just store subject with VAC suffix info
+            subject = core.strip() if core else joined_text.strip()
+            code_match = _RE_SUBJECT_CODE.search(subject)
+            subject_code = code_match.group(1) if code_match else None
+            subject = _strip_subject_code(subject, subject_code)
+            
+            return [{
+                "subject": subject[:80],
+                "subject_code": subject_code,
+                "class_type": "theory",
+                "batch": "ALL",
+                "faculty": None,
+                "room": None,
             }]
 
     # ── MULTI-LINE / COMPLEX FORMAT (3+ lines or unmatched 2-line) ──
