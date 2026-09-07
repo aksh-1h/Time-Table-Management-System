@@ -4,8 +4,12 @@
  * Shared ESM module for room assignment state.
  * 
  * BUG-4 FIX: Assignments are persisted to the `slot_assignments` table in Supabase.
- * In-memory state serves as a hot cache, but the DB is the source of truth.
- * On assignment runs, results are written to DB. On reads, DB is checked first.
+ * The `slot_assignments` table is the single source of truth for room data.
+ * GET /api/slots reads it directly on each request (no startup hydration needed).
+ * 
+ * The in-memory cache below is only used by:
+ *   - POST /api/assign (occupancy tracking during a single algorithm run)
+ *   - Offline / no-Supabase fallback in GET /api/slots
  * 
  * BUG-5 FIX: This replaces the broken require() cross-module pattern between
  * slots/route.js and assign/route.js. Both routes now import from this single
@@ -14,10 +18,9 @@
 
 import { createServerSupabaseClient } from './supabase-server';
 
-// ── In-memory hot cache (populated from DB on first access) ──
+// ── In-memory state (used by POST /api/assign and offline fallback only) ──
 let _globalOccupancy = {};       // "day|roomNo" → [{ start, end, slotId, program, semester, division }]
 let _globalAssignments = {};     // slotId → { roomNo, roomObj, manually }
-let _cacheLoaded = false;
 
 // ── Public accessors ──
 
@@ -27,60 +30,6 @@ export function getGlobalAssignments() {
 
 export function getGlobalOccupancy() {
   return _globalOccupancy;
-}
-
-/**
- * Load persisted assignments from the `slot_assignments` table into the in-memory cache.
- * Called once on first access and after each assignment run.
- */
-export async function loadAssignmentsFromDB() {
-  const supabase = createServerSupabaseClient();
-  if (!supabase) return;
-
-  try {
-    const { data: assignments, error } = await supabase
-      .from('slot_assignments')
-      .select('*, rooms:room_id(*)');
-
-    if (error) {
-      console.error('[assignment-state] Error loading from DB:', error.message);
-      return;
-    }
-
-    if (!assignments || assignments.length === 0) return;
-
-    // Rebuild in-memory state from DB
-    for (const sa of assignments) {
-      const slotId = sa.id;
-      const roomObj = sa.rooms || null;
-      const roomNo = roomObj ? roomObj.room_no : null;
-
-      if (roomNo && roomObj) {
-        _globalAssignments[slotId] = {
-          roomNo,
-          roomObj,
-          manually: sa.manually_assigned || false,
-        };
-
-        // Rebuild occupancy
-        const key = `${sa.day}|${normRoom(roomNo)}`;
-        if (!_globalOccupancy[key]) _globalOccupancy[key] = [];
-        _globalOccupancy[key].push({
-          start: sa.start_time,
-          end: sa.end_time,
-          slotId,
-          program: sa.program || '',
-          semester: sa.semester,
-          division: sa.division,
-        });
-      }
-    }
-
-    _cacheLoaded = true;
-    console.log(`[assignment-state] Loaded ${assignments.length} assignments from DB`);
-  } catch (e) {
-    console.error('[assignment-state] DB load error:', e.message);
-  }
 }
 
 /**
@@ -207,10 +156,13 @@ export async function persistSingleAssignment(slotData, roomObj, manually = fals
       manually_assigned: manually,
     };
 
-    // Upsert: delete existing for same slot, then insert
+    // Upsert: delete existing for same slot, then insert.
+    // BUG FIX: scope delete by program to prevent cross-program collisions
+    // (migration 004 added the program column specifically for this reason).
     await supabase
       .from('slot_assignments')
       .delete()
+      .eq('program', row.program)
       .eq('division', row.division)
       .eq('batch', row.batch)
       .eq('semester', row.semester)

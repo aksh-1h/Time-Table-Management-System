@@ -153,7 +153,10 @@ export async function POST(request) {
         parsing_score: e.parsing_score || 0
       }));
 
-      const { error: insertError } = await supabase.from('timetable_entries').insert(entriesWithUploadId);
+      const { data: insertedEntries, error: insertError } = await supabase
+        .from('timetable_entries')
+        .insert(entriesWithUploadId)
+        .select();
 
       if (insertError) {
         console.error('Error inserting entries:', insertError);
@@ -176,19 +179,7 @@ export async function POST(request) {
         slotsCount: entries.length,
         overallParsingScore,
         parserSource: 'python',
-        entries: entries.map(e => ({
-          day: e.day,
-          period: e.period,
-          start_time: e.start_time,
-          end_time: e.end_time,
-          subject: e.subject,
-          subject_code: e.subject_code,
-          class_type: e.class_type,
-          batch: e.batch,
-          faculty: e.faculty,
-          room: e.room,
-          parsing_score: e.parsing_score || 0
-        }))
+        entries: insertedEntries || []
       });
     } else {
       await Promise.all([

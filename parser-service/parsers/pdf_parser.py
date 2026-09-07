@@ -415,6 +415,53 @@ def _parse_pdf_native_stream(file_bytes: bytes) -> List[dict]:
     return entries
 
 
+def _preprocess_for_ocr(pil_img):
+    """Preprocess a PIL image for better OCR accuracy on scanned timetables.
+
+    Only improves the image quality fed to the OCR engine.
+    Does NOT change any coordinates, thresholds, or parsing logic.
+    """
+    try:
+        from PIL import ImageEnhance, ImageOps
+
+        # Convert to grayscale — removes color noise
+        gray = pil_img.convert("L")
+
+        # Auto-contrast — normalizes brightness/darkness across the page
+        gray = ImageOps.autocontrast(gray, cutoff=1)
+
+        # Boost contrast so text stands out from background
+        gray = ImageEnhance.Contrast(gray).enhance(1.8)
+
+        # Sharpen to make character edges crisper
+        gray = ImageEnhance.Sharpness(gray).enhance(2.0)
+
+        # Convert back to RGB (WinRT OCR expects color input)
+        return gray.convert("RGB")
+    except ImportError:
+        return pil_img
+
+
+def _clean_ocr_word(text: str) -> str:
+    """Fix common OCR character misreadings in a single word.
+
+    Only fixes character-level errors. Does NOT change word boundaries,
+    coordinates, or any parsing logic.
+    """
+    if not text:
+        return text
+    t = text
+    # Semicolons misread instead of colons in time values
+    t = t.replace(";", ":")
+    # Pipes/bars misread as I or l
+    t = t.replace("|", "I")
+    # Stray backticks/tildes from image noise
+    t = t.replace("`", "").replace("~", "")
+    # Zero-width unicode artifacts
+    t = t.replace("\u200b", "").replace("\u00ad", "").replace("\ufeff", "")
+    return t.strip()
+
+
 def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
     """Extract timetable cells from image-based scanned PDFs using native Windows WinRT OCR."""
     try:
@@ -447,6 +494,9 @@ def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
                 new_size = (int(pil_img.width * scale_factor), int(pil_img.height * scale_factor))
                 pil_img = pil_img.resize(new_size)
 
+            # Preprocess image for better OCR character recognition
+            pil_img = _preprocess_for_ocr(pil_img)
+
             ocr_res = await winocr.recognize_pil(pil_img, lang="en")
             if not ocr_res or not hasattr(ocr_res, "lines"):
                 continue
@@ -454,8 +504,12 @@ def _parse_pdf_with_ocr(file_bytes: bytes) -> List[dict]:
             all_words = []
             for line in ocr_res.lines:
                 for w in line.words:
+                    # Clean common OCR misreadings (;→: |→I etc.)
+                    cleaned_text = _clean_ocr_word(w.text)
+                    if not cleaned_text:
+                        continue
                     all_words.append({
-                        "text": w.text,
+                        "text": cleaned_text,
                         "x0": w.bounding_rect.x,
                         "y0": w.bounding_rect.y,
                         "x1": w.bounding_rect.x + w.bounding_rect.width,

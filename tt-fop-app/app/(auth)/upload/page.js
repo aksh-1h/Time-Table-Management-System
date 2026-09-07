@@ -241,11 +241,11 @@ export default function UploadPage() {
       setReviewBatchLabel(batch.label);
       setReviewMessage(data.message || '');
 
-      // If entries are included in the response, use them directly
-      if (data.entries && data.entries.length > 0) {
+      // If entries are included in the response and have IDs, use them directly
+      if (data.entries && data.entries.length > 0 && data.entries[0]?.id) {
         setReviewEntries(data.entries);
       } else {
-        // Fetch from API
+        // Fetch from API to ensure we have DB IDs
         await fetchReviewEntries(data.id);
       }
 
@@ -365,23 +365,52 @@ export default function UploadPage() {
   // ── Delete a single entry ──
   const handleDeleteEntry = async (index) => {
     const entry = reviewEntries[index];
-    if (!entry?.id) return;
-    if (!confirm(`Delete entry: "${entry.subject}" on ${entry.day} Period ${entry.period}?`)) return;
+    if (!entry) return;
+
+    const subjectLabel = entry.subject ? `"${entry.subject}"` : 'this slot';
+    const dayLabel = entry.day ? ` on ${entry.day}` : '';
+    const periodLabel = entry.period !== undefined ? ` (Period ${entry.period})` : '';
+    
+    if (!window.confirm(`Delete slot: ${subjectLabel}${dayLabel}${periodLabel}?`)) return;
 
     try {
-      const res = await fetch(`/api/schedules/entries?id=${entry.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete entry');
+      if (entry.id) {
+        const res = await fetch(`/api/schedules/entries?id=${encodeURIComponent(entry.id)}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to delete slot from database');
+        }
+      }
 
       const updated = [...reviewEntries];
       updated.splice(index, 1);
       setReviewEntries(updated);
 
+      // Clean up editedEntries indices
+      setEditedEntries(prev => {
+        const next = {};
+        Object.keys(prev).forEach(k => {
+          const idxNum = parseInt(k, 10);
+          if (idxNum < index) {
+            next[idxNum] = prev[idxNum];
+          } else if (idxNum > index) {
+            next[idxNum - 1] = prev[idxNum];
+          }
+        });
+        return next;
+      });
+
       // Recalculate overall score
       const scores = updated.map(e => e.parsing_score || 0);
       const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
       setOverallScore(Math.round(avg * 10) / 10);
+      setReviewMessage('Slot deleted successfully.');
+
+      // Refresh schedule list in background
+      fetchScheduleList();
     } catch (err) {
-      alert(err.message);
+      console.error('Delete slot error:', err);
+      alert(`Error deleting slot: ${err.message}`);
     }
   };
 
@@ -646,17 +675,35 @@ export default function UploadPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button
-                            onClick={() => handleDeleteEntry(idx)}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: 'var(--slate)', padding: '4px',
-                              transition: 'color 150ms',
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteEntry(idx);
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--conflict-red)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--slate)'}
-                            title="Delete entry"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--slate)',
+                              padding: '6px',
+                              borderRadius: 'var(--radius)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 150ms',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = 'var(--conflict-red)';
+                              e.currentTarget.style.background = 'rgba(224,49,49,0.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = 'var(--slate)';
+                              e.currentTarget.style.background = 'none';
+                            }}
+                            title="Delete slot"
+                            aria-label="Delete slot"
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                             </svg>
                           </button>
